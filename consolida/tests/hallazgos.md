@@ -1,6 +1,6 @@
 # Hallazgos del motor sobre los datos reales del Grupo Meridia
 
-Generado por `php tests/run.php` el 2026-11-21 19:18 UTC con los 21 archivos de `datos-meridia/`. Lectura (Agente R) + reglas, conciliación, consolidación, KPIs y desviaciones (Agente F). Impacto en USD (valor absoluto).
+Generado por `php tests/run.php` el 2026-11-21 19:40 UTC con los 21 archivos de `datos-meridia/`. Lectura (Agente R) + reglas, conciliación, consolidación, KPIs y desviaciones (Agente F). Impacto en USD (valor absoluto).
 
 ## Resumen por versión y categoría
 

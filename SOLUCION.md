@@ -1,15 +1,15 @@
-# Consolida · solución al reto «Consolidación multiempresa» (Grupo Meridia)
+# Trazo · solución al reto «Consolidación multiempresa» (Grupo Meridia)
 
 > **El reto.** ¿Cómo lograr que el presupuesto de un grupo se consolide solo, en una moneda y sin capturas manuales,
 > y que cada cifra se explique sola?
 
-**Consolida** es un sistema web (plugin de WordPress, igual en estructura al panel DMM de SolucionWeb) que recibe el
+**Trazo** es un sistema web (plugin de WordPress, igual en estructura al panel DMM de SolucionWeb) que recibe el
 Excel de cada país tal como lo entrega, lo lee aunque cada país use otro formato, frena los errores antes de que
 entren al número del grupo, elimina lo intercompañía, convierte todo a dólares con las tasas oficiales, explica cada
 desviación y calcula ROIC, ROCE y EVA. Cada cifra se puede rastrear hasta el archivo, la hoja, la fila y la columna que
 la originó.
 
-- Sitio: `https://trazo.kinsta.cloud/consolida/`
+- Sitio: `https://trazo.kinsta.cloud/trazo/`
 - Código: `consolida/` · Contrato técnico: [`CONTRACT.md`](CONTRACT.md) · Plan por fases: [`PLAN.md`](PLAN.md)
 - Hallazgos completos generados por el sistema: [`consolida/tests/hallazgos.md`](consolida/tests/hallazgos.md)
 - Pizarra de conceptualización: https://claude.ai/artifact/Wk3SubbsmY9mgU4zTRjDyW
@@ -18,7 +18,7 @@ la originó.
 
 ## 1. Qué problema resuelve
 
-| Dolor del reto | Cómo lo resuelve Consolida |
+| Dolor del reto | Cómo lo resuelve Trazo |
 | --- | --- |
 | **Consolidación manual**: cada empresa usa otro formato y los totales se suman a mano | Un **perfil de lectura por país** entiende su formato (ancho o largo, idioma, fechas, escala, nombres o códigos de cuenta) y lo traduce al catálogo único del grupo. La consolidación es un botón. |
 | **Ventas entre empresas** que se cuentan doble | Conciliación intercompañía **mes a mes y por tipo** (venta de producto, cuota de administración, préstamo e intereses) desde los dos lados, y eliminación automática de ventas, costos, saldos, préstamos, intereses y **margen no realizado en inventario**. |

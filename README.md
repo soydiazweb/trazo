@@ -1,12 +1,12 @@
-# Trazo · Consolida
+# Trazo · Consolidación multiempresa
 
 Solución al reto **«Consolidación multiempresa»** (Accounting) para el Grupo Meridia: el presupuesto de un grupo con 5
 países y 3 monedas que se consolida solo, en una moneda, sin capturas manuales y con cada cifra explicada.
 
 | | |
 | --- | --- |
-| Sistema | Plugin de WordPress **Consolida** → [`consolida/`](consolida/) |
-| En línea | https://trazo.kinsta.cloud/consolida/ |
+| Sistema | Plugin de WordPress **Trazo** → [`consolida/`](consolida/) |
+| En línea | https://trazo.kinsta.cloud/trazo/ |
 | Documento de la solución | [`SOLUCION.md`](SOLUCION.md): reto, procesos, datos analizados, hallazgos y logros del módulo 5 |
 | Plan por fases con agentes | [`PLAN.md`](PLAN.md) |
 | Contrato técnico | [`CONTRACT.md`](CONTRACT.md) (v2, basado en los datos reales) |

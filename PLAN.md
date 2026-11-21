@@ -1,4 +1,4 @@
-# Consolida · plan de creación por fases con agentes
+# Trazo · plan de creación por fases con agentes
 
 Sistema web (plugin de WordPress) que consolida el presupuesto del **Grupo Meridia** (Guatemala, México, Panamá,
 Ecuador y Estados Unidos; GTQ, MXN y USD) a partir de los 20 Excel de los países, cada uno en su propio formato, y del
@@ -7,7 +7,7 @@ intercompañía, explica cada desviación y calcula ROIC, ROCE y EVA. Contrato t
 Sigue la misma estructura que SW HQ (panel DMM): plugin con tablas propias, API REST y un panel de una sola página.
 
 - Sitio destino: `https://trazo.kinsta.cloud` (vía Novamira).
-- Panel: `/consolida/` · API: `/wp-json/consolida/v1`.
+- Panel: `/trazo/` · API: `/wp-json/consolida/v1`.
 - Roles: **País** (responsable de datos), **Corporativo** (finanzas del grupo), **Directiva**; el administrador ve todo.
 - Base de la pizarra: módulos 1–5 + Trazabilidad y el flujo de 10 pantallas.
 

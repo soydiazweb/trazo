@@ -1,4 +1,4 @@
-/* Consolida · panel (SPA sin dependencias). Autor: Jonathan Diaz · https://www.soydiaz.com
+/* Trazo · panel de consolidación del grupo (SPA sin dependencias). Autor: Jonathan Diaz · https://www.soydiaz.com
    API v2 (datos reales del Grupo Meridia): versiones por clave (ppto_2026, real_2026, ppto_2027_v1, ppto_2027_v2),
    países GT/MX/PA/EC/US, tasas mensuales, 6 categorías de hallazgo, perfiles de lectura por país.
    Lee window.CSL = {api, nonce, user, version, logout}. Rutas por hash (#/inicio, #/carga, …).
@@ -315,6 +315,9 @@
     trend: [['path', { d: 'M3 17l6-6 4 4 8-8' }], ['path', { d: 'M15 7h6v6' }]],
     bulb: [['path', { d: 'M9 18h6M10 21h4' }], ['path', { d: 'M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z' }]],
     briefcase: [['rect', { x: '3', y: '7', width: '18', height: '13', rx: '2' }], ['path', { d: 'M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2' }], ['path', { d: 'M3 13h18' }]],
+    calendar: [['rect', { x: '3', y: '5', width: '18', height: '16', rx: '2' }], ['path', { d: 'M3 10h18M8 3v4M16 3v4' }]],
+    factory: [['path', { d: 'M3 21V10l6 4V10l6 4V6l6 3v12z' }], ['path', { d: 'M7 17h2M12 17h2M17 17h2' }]],
+    swap: [['path', { d: 'M4 8h13l-3-3' }], ['path', { d: 'M20 16H7l3 3' }]],
     sliders: [['path', { d: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0' }], ['circle', { cx: '16', cy: '6', r: '2' }], ['circle', { cx: '10', cy: '12', r: '2' }], ['circle', { cx: '18', cy: '18', r: '2' }]]
   };
   function icon(name, size) {
@@ -532,7 +535,7 @@
   function buildShell() {
     clear(app);
     nav = h('nav', { class: 'side', id: 'csl-nav', 'aria-label': 'Secciones' },
-      h('div', { class: 'brand' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true', text: 'C' }), h('div', {}, h('b', { text: 'Consolida' }), h('small', { text: 'Grupo Meridia' }))));
+      h('div', { class: 'brand' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true', text: 'T' }), h('div', {}, h('b', { text: 'Trazo' }), h('small', { text: 'Consolidación del grupo · Grupo Meridia' }))));
     navGroups().forEach(function (g) {
       var items = g[1].filter(function (it) { return it[3]; });
       if (!items.length) return;
@@ -548,7 +551,9 @@
 
     versionSel = h('select', { id: 'csl-version', onchange: function () {
       if (DIRTY && !confirm('Tienes cambios sin guardar. ¿Cambiar de versión sin guardar?')) { versionSel.value = VERSION || ''; return; }
-      DIRTY = false; setVersion(versionSel.value); route();
+      DIRTY = false; setVersion(versionSel.value);
+      // La base de comparación del Inicio depende de la versión: al cambiarla se vuelve a la sugerida.
+      if (/^#\/inicio\/./.test(location.hash)) location.hash = '#/inicio'; else route();
     } });
     fillVersionSel();
     scoreEl = h('a', { class: 'score', href: '#/hallazgos', hidden: true });
@@ -614,7 +619,7 @@
       a.classList.toggle('on', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    document.title = (TITLES[key] || 'Consolida') + ' · Consolida';
+    document.title = (TITLES[key] || 'Trazo') + ' · Trazo';
     clear(main);
     return main;
   }
@@ -648,27 +653,385 @@
   /* =====================================================================
      1 · Inicio por rol
      ===================================================================== */
-  function viewHome() {
-    var m = page('inicio'), c = caps();
-    var intro = c.corp ? 'Estado de cada país en la versión, tasas y consolidación.' : c.country ? 'Carga el Excel de tu país, corrige lo que el sistema marque y envíalo al corporativo.' : 'Resumen del grupo para decidir.';
-    add(m, header(VERSION ? versionLabel(VERSION) : null, 'Hola, ' + firstName(), intro));
+  /* =====================================================================
+     1b · Inicio del corporativo, la directiva y el administrador: tablero del grupo
+     Se arma en el navegador con /home, /summary, /kpi (versión y base), /proposals, /history, /findings, /variance y
+     /rates. Las oportunidades de mejora salen de reglas fijas sobre esos datos (no hay IA conectada).
+     ===================================================================== */
+  /** Versión base sugerida, con la misma regla que Store::base_version: v(N) → v(N−1); ppto_Y(_v1) → real_(Y−1); real_Y → ppto_Y. */
+  function baseFor(key) {
+    var m = /^(ppto|real)_(\d{4})(?:_v(\d+))?$/.exec(key || ''), cand = [];
+    if (m) {
+      var y = Number(m[2]), n = m[3] ? Number(m[3]) : 0;
+      if (m[1] === 'ppto' && n > 1) cand.push('ppto_' + y + '_v' + (n - 1));
+      if (m[1] === 'ppto') cand.push('real_' + (y - 1));
+      if (m[1] === 'real') { cand.push('ppto_' + y); for (var i = 9; i >= 1; i--) cand.push('ppto_' + y + '_v' + i); }
+    }
+    for (var j = 0; j < cand.length; j++) if (versionByKey(cand[j])) return cand[j];
+    var keys = META.versions.map(function (v) { return v.key; }), idx = keys.indexOf(key); // versiones de la más reciente a la más antigua
+    return idx >= 0 && keys[idx + 1] ? keys[idx + 1] : null;
+  }
+  function countryName(code) { var c = companyByCode(code); return c ? (c.country || c.name) : String(code || ''); }
+  function ownerOf(code) { var c = companyByCode(code) || {}; return [c.data_owner, c.country].filter(Boolean).join(', ') || String(code || ''); }
+  function marginOf(x) { return x && isNum(x.ebit) && Number(x.revenue) ? Number(x.ebit) / Number(x.revenue) : null; }
+  function rotOf(x) { return x && Number(x.ci) > 0 && isNum(x.revenue) ? Number(x.revenue) / Number(x.ci) : null; }
+  function wcDays(x) { return x && isNum(x.nowc) && Number(x.revenue) ? Number(x.nowc) / Number(x.revenue) * 365 : null; }
+  function times(v) { return isNum(v) ? nf(2, 2).format(Number(v)) + '×' : '—'; }
+  function millions(v) { return isNum(v) ? plus(v, num(Number(v) / 1e6, 2)) : '—'; }
+  /** Promedio anual de la tasa promedio (meses 1..12) de una moneda en la respuesta de /rates. */
+  function avgRate(R, cur) {
+    var v = arr(R && R.rows).filter(function (r) { return r.currency === cur && r.month >= 1 && isNum(r.avg); }).map(function (r) { return Number(r.avg); });
+    return v.length ? v.reduce(function (s, x) { return s + x; }, 0) / v.length : null;
+  }
+  /** Años seguidos con EVA negativo en cifras reales (historial + real_AAAA), contando hacia atrás desde el último real. */
+  function evaStreak(Hs, code) {
+    var pts_ = arr(obj(Hs && Hs.trend)[code]).filter(function (p) { return p.source === 'historial' || /^real_/.test(String(p.source || '')); })
+      .sort(function (a, b) { return (a.year || 0) - (b.year || 0); });
+    var n = 0, from = null;
+    for (var i = pts_.length - 1; i >= 0; i--) { if (isNum(pts_[i].eva) && Number(pts_[i].eva) < 0) { n++; from = pts_[i].year; } else break; }
+    return { years: n, from: from };
+  }
+  var NUM_WORD = ['', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'];
+
+  function viewHome(baseKey) {
+    var c = caps();
+    if (c.corp || c.board) { viewDashboard(baseKey); return; }
+    var m = page('inicio');
+    add(m, header(VERSION ? versionLabel(VERSION) : null, 'Hola, ' + firstName(), c.country ? 'Carga el Excel de tu país, corrige lo que el sistema marque y envíalo al corporativo.' : 'Resumen del grupo.'));
     var body = skel(3); add(m, body);
     var load = function () {
-      var calls = [api('/home' + qs({ version: VERSION })), c.corp && VERSION ? api('/rates' + qs({ version: VERSION })).catch(function () { return null; }) : Promise.resolve(null)];
-      Promise.all(calls).then(function (r) {
-        var H = r[0] || {}, cos = arr(H.companies);
+      api('/home' + qs({ version: VERSION })).then(function (H) {
+        H = H || {};
         ready(body);
         if (!H.hasCorporate || !META.versions.length) add(body, homeNoData());
-        else {
-          if (c.country) add(body, homeCountry(cos));
-          if (c.corp) add(body, homeCorp(H, cos, r[1]));
-          if (c.board) add(body, homeBoard(H));
-        }
-        if (c.admin && H.hasCorporate) add(body, meridiaCard());
+        else if (c.country) add(body, homeCountry(arr(H.companies)));
       }, function (e) { errorState(body, e, load); });
     };
     load();
   }
+
+  function viewDashboard(baseKey) {
+    var m = page('inicio');
+    if (!VERSION) { add(m, h('h1', { class: 'sr-only', tabindex: '-1', text: 'Inicio' })); add(m, homeNoData()); return; }
+    var key = VERSION;
+    var base = baseKey === '-' ? null : baseKey && baseKey !== key && versionByKey(baseKey) ? baseKey : baseFor(key);
+    add(m, h('h1', { class: 'sr-only', tabindex: '-1', text: 'Inicio · ' + versionLabel(key) }));
+    var body = skel(4); add(m, body);
+    var soft = function (p) { return p.catch(function () { return null; }); };
+    var load = function () {
+      Promise.all([
+        api('/home' + qs({ version: key })),
+        soft(maybe(api('/summary' + qs({ version: key })))),
+        maybe(api('/kpi' + qs({ version: key }))),
+        base ? soft(maybe(api('/kpi' + qs({ version: base })))) : null,
+        soft(api('/proposals')),
+        soft(api('/history')),
+        soft(api('/findings' + qs({ version: key }))),
+        base ? soft(api('/variance' + qs({ a: key, b: base }))) : null,
+        soft(api('/rates' + qs({ version: key }))),
+        base ? soft(api('/rates' + qs({ version: base }))) : null
+      ]).then(function (r) {
+        ready(body);
+        var D = { H: r[0] || {}, S: r[1], K: r[2], KB: r[3], P: r[4], Hs: r[5], F: r[6], V: r[7], RA: r[8], RB: r[9], key: key, base: base };
+        if (!D.H.hasCorporate || !META.versions.length) { add(body, homeNoData()); return; }
+        renderDashboard(body, D);
+      }, function (e) { errorState(body, e, load); });
+    };
+    load();
+  }
+
+  function renderDashboard(body, D) {
+    var key = D.key, base = D.base, K = D.K, KB = D.KB && D.KB.companies ? D.KB : null;
+    var bl = base ? versionLabel(base) : '';
+    var nAll = META.companies.length;
+    var prov = arr(D.S && D.S.provisional);
+    var crit = D.F && D.F.counts ? D.F.counts.critical : D.H.scoreboard ? D.H.scoreboard.critical : null;
+
+    /* ---- franja ---- */
+    var baseSel = select([['-', 'Sin comparación']].concat(META.versions.filter(function (v) { return v.key !== key; }).map(function (v) { return [v.key, v.label]; })), base || '-', { id: 'csl-base' });
+    baseSel.onchange = function () { location.hash = '#/inicio/' + baseSel.value; };
+    var consolidated = K && K.companies ? Object.keys(obj(K.companies)).length : 0;
+    add(body, h('div', { class: 'strip' },
+      h('span', { class: 'strip-i' }, icon('calendar', 15), h('span', { text: versionLabel(key) })),
+      h('span', { class: 'strip-i' }, icon(consolidated && consolidated === nAll ? 'check' : 'alert', 15), h('span', { text: num(consolidated) + ' de ' + num(nAll) + ' sedes consolidadas · cifras en USD' })),
+      prov.length ? tag('Provisional: incluye errores abiertos de ' + prov.map(countryName).join(', '), 'warn') : null,
+      isNum(crit) ? h('a', { class: 'strip-i' + (Number(crit) ? ' c-bad' : ''), href: '#/hallazgos/' + key }, icon(Number(crit) ? 'alert' : 'check', 15), h('span', { text: num(crit) + (Number(crit) === 1 ? ' error crítico encontrado' : ' errores críticos encontrados') })) : null,
+      h('span', { class: 'grow' }),
+      h('div', { class: 'strip-sel' }, h('label', { for: 'csl-base', text: 'Comparar con' }), baseSel)));
+
+    if (!K || !K.companies) {
+      add(body, note('info', 'info', 'Aún no hay consolidación de ' + versionLabel(key), 'El tablero del grupo aparece cuando el corporativo consolida esta versión.' + (caps().corp ? ' Mientras tanto, este es el estado de la carga.' : '')));
+      if (caps().corp) add(body, homeCorp(D.H, arr(D.H.companies), D.RA));
+      if (caps().admin) add(body, meridiaCard());
+      return;
+    }
+    if (base && !KB) add(body, note('warn', 'alert', null, bl + ' no tiene consolidación: el tablero se muestra sin comparación. Elige otra base en «Comparar con».'));
+
+    var cos = obj(K.companies), G = K.group || {}, GB = KB ? KB.group || {} : null, BC = KB ? obj(KB.companies) : {};
+    var codes = Object.keys(cos);
+    var props = D.P ? arr(D.P.items) : [], recalc = !!(D.P && D.P.recalculated);
+    var atRisk = recalc ? props.filter(function (p) { return p.holds === false; }) : [];
+    var sumRev = codes.reduce(function (s, c) { return s + (Number(cos[c].revenue) || 0); }, 0);
+    var sumEva = codes.reduce(function (s, c) { return s + (Number(cos[c].eva) || 0); }, 0);
+    var gm = marginOf(G), gmB = GB ? marginOf(GB) : null;
+    var creates = Number(G.eva) >= 0;
+    var destroyers = codes.filter(function (c) { return Number(cos[c].eva) < 0; }).sort(function (a, b) { return cos[a].eva - cos[b].eva; });
+
+    /* ---- oportunidades (reglas) ---- */
+    var opps = buildOpportunities(D, cos, G, atRisk);
+    var reasonBy = {};
+    opps.forEach(function (o) { if (o.site && !reasonBy[o.site]) reasonBy[o.site] = o; });
+
+    /* ---- resumen ---- */
+    var s1 = creates
+      ? 'El grupo crea valor: ROIC de ' + pct(G.roic) + ' sobre un costo de capital de ' + pct(G.wacc) + ' y EVA de ' + usdM(G.eva) + '.'
+      : 'El grupo destruye valor: ROIC de ' + pct(G.roic) + ' frente a un costo de capital de ' + pct(G.wacc) + ' y EVA de ' + usdM(G.eva) + '.';
+    var s2 = !destroyers.length ? 'Todas las sedes crean valor'
+      : destroyers.length === 1 ? countryName(destroyers[0]) + ' es la única sede que destruye valor'
+        : destroyers.slice(0, -1).map(countryName).join(', ') + ' y ' + countryName(destroyers[destroyers.length - 1]) + ' destruyen valor';
+    var s3 = '';
+    if (atRisk.length === 1) {
+      var p0 = atRisk[0], rel = Number(p0.roic) < Number(p0.wacc) ? 'por debajo de su WACC de ' : 'a menos de 2 puntos de su WACC de ';
+      s3 = 'el proyecto ' + p0.id + ' de ' + countryName(p0.site) + ' no se sostiene: recalculado, su ROIC de ' + pct(p0.roic) + ' queda ' + rel + pct(p0.wacc) + ' («' + p0.decision_recalculada + '», no «' + p0.decision_propuesta + '»)';
+    } else if (atRisk.length > 1) s3 = atRisk.length + ' proyectos de inversión no se sostienen (' + atRisk.map(function (p) { return p.id; }).join(', ') + ')';
+    var lead = s1 + ' ' + s2 + (s3 ? ', y ' + s3 : '') + '.';
+    add(body, h('section', { class: 'card lead-card', 'aria-label': 'Resumen del grupo' },
+      h('div', { class: 'lead-h' }, h('small', { text: 'Resumen del grupo' }), creates ? tag('Crea valor', 'ok') : tag('Destruye valor', 'bad')),
+      h('p', { class: 'lead', text: lead })));
+
+    /* ---- 5 indicadores ---- */
+    var delta = function (d, text, goodUp) {
+      if (!GB || !isNum(d)) return null;
+      var zero = Math.abs(Number(d)) < 1e-9, good = goodUp ? d > 0 : d < 0;
+      return h('span', { class: 'delta ' + (zero ? 'muted' : good ? 'c-ok' : 'c-bad') }, icon(d >= 0 ? 'arrowUp' : 'arrowDown', 13), h('span', { text: text + ' vs ' + bl }));
+    };
+    var tile = function (label, value, sub, d) { return h('div', { class: 'kpi tile' }, h('small', { text: label }), h('b', { text: value }), sub ? h('span', { text: sub }) : null, d || null); };
+    add(body, h('div', { class: 'tiles' }, [
+      tile('ROIC del grupo', pct(G.roic), 'WACC ' + pct(G.wacc), GB ? delta((G.roic - GB.roic) * 100, pts((G.roic - GB.roic) * 100), true) : null),
+      tile('EVA del grupo', usdM(G.eva), creates ? 'valor creado en el año' : 'valor destruido en el año', GB ? delta(G.eva - GB.eva, signedUsdM(G.eva - GB.eva), true) : null),
+      tile('Ingresos consolidados', usdM(G.revenue), 'sin ' + usdM(sumRev - G.revenue) + ' entre sedes', GB && Number(GB.revenue) ? delta((G.revenue - GB.revenue) / GB.revenue, signedPct((G.revenue - GB.revenue) / GB.revenue), true) : null),
+      tile('Margen EBIT', pct(gm), 'EBIT ' + usdM(G.ebit), isNum(gmB) ? delta((gm - gmB) * 100, pts((gm - gmB) * 100), true) : null),
+      tile('Decisiones en riesgo', recalc ? num(atRisk.length) + ' de ' + num(props.length) : '—', 'proyectos de inversión',
+        !recalc ? h('span', { class: 'delta muted', text: 'Sin recálculo disponible' })
+          : atRisk.length ? h('span', { class: 'delta c-bad' }, icon('alert', 13), h('span', { text: atRisk.map(function (p) { return p.id; }).join(', ') + (atRisk.length === 1 ? ' se presentó' : ' se presentaron') + ' con una decisión que no se sostiene' }))
+            : h('span', { class: 'delta c-ok' }, icon('check', 13), h('span', { text: 'Todas las decisiones se sostienen' })))
+    ]));
+
+    /* ---- quién suma y quién resta valor + crecimiento vs rentabilidad ---- */
+    var evaCard = card('Quién suma y quién resta valor', 'EVA ' + versionLabel(key) + ' por sede, US$ millones');
+    var rows = codes.slice().sort(function (a, b) { return cos[b].eva - cos[a].eva; }).map(function (c) { return { label: countryName(c), v: Number(cos[c].eva) || 0, href: '#/indicadores' }; });
+    var elim = (Number(G.eva) || 0) - sumEva;
+    add(evaCard, evaBars(rows, elim, Number(G.eva) || 0));
+    if (destroyers.length) {
+      var w = destroyers[0], x = cos[w], st = evaStreak(D.Hs, w);
+      var hist = st.years >= 2 ? countryName(w) + ' destruye valor desde ' + st.from + ': ' + (NUM_WORD[st.years] || st.years) + ' años seguidos con EVA negativo en sus cifras reales. ' : st.years === 1 ? countryName(w) + ' ya destruyó valor en su último año real. ' : countryName(w) + ' destruye valor en esta versión. ';
+      add(evaCard, note('info', 'info', null, hist + 'En ' + versionLabel(key) + ' su ROIC es ' + pct(x.roic) + ' contra un WACC de ' + pct(x.wacc) + '.'));
+    } else add(evaCard, note('ok', 'check', null, 'Todas las sedes crean valor en ' + versionLabel(key) + '.'));
+    var bubCard = card('Crecimiento frente a rentabilidad', GB ? 'Ingresos vs ' + bl + ' · tamaño de la burbuja = ingresos de la sede' : 'Elige una base consolidada para ver el crecimiento');
+    if (GB) {
+      var items = codes.filter(function (c) { return BC[c] && Number(BC[c].revenue); }).map(function (c, i) {
+        return { code: c, name: countryName(c), x: (cos[c].revenue - BC[c].revenue) / BC[c].revenue * 100, y: (cos[c].roic - cos[c].wacc) * 100, size: Number(cos[c].revenue) || 0, cls: 's' + ((i % 6) + 1) };
+      }).filter(function (it) { return isNum(it.x) && isNum(it.y); });
+      add(bubCard, items.length ? bubbleChart(items) : empty('Sin datos para comparar.', null));
+    } else add(bubCard, empty('Sin base para comparar.', 'Elige en «Comparar con» una versión consolidada.'));
+    add(body, h('div', { class: 'dash-2' }, evaCard, bubCard));
+
+    /* ---- ranking + ROIC vs WACC ---- */
+    var rk = card('Ranking por sede', 'ROIC = margen × rotación del capital. Toca una sede para ver su detalle.');
+    var lowRot = null, lowMar = null;
+    opps.forEach(function (o) { if (o.kind === 'capital') lowRot = o.site; if (o.kind === 'margen') lowMar = o.site; });
+    var rkRows = codes.slice().sort(function (a, b) { return (cos[b].roic || 0) - (cos[a].roic || 0); }).map(function (c) {
+      var x = cos[c], o = reasonBy[c], go = function () { location.hash = '#/indicadores'; };
+      var chip = o ? h('span', { class: 'tag t-' + o.chip }, icon(o.icon, 13), h('span', { text: o.reason })) : Number(x.eva) >= 0 ? tag('Crea valor', 'ok') : tag('Destruye valor', 'bad');
+      return h('tr', { class: 'click', tabindex: '0', onclick: go, onkeydown: function (e) { if (e.key === 'Enter') go(); } },
+        h('th', { scope: 'row' }, h('a', { href: '#/indicadores', text: countryName(c) })), tdn(shortM(x.revenue)),
+        tdn(pct(x.roic), Number(x.roic) < Number(x.wacc) ? 'neg' : ''), tdn(pct(x.wacc)), tdn(pct(marginOf(x)), c === lowMar ? 'neg' : ''),
+        tdn(times(rotOf(x)), c === lowRot ? 'neg' : ''), tdn(num(wcDays(x))), td(chip));
+    });
+    rkRows.push(h('tr', { class: 'total' }, h('th', { scope: 'row', text: 'Grupo' }), tdn(shortM(G.revenue)), tdn(pct(G.roic)), tdn(pct(G.wacc)), tdn(pct(gm)), tdn(times(rotOf(G))), tdn(num(wcDays(G))), td(creates ? tag('Crea valor', 'ok') : tag('Destruye valor', 'bad'))));
+    add(rk, table([['Sede'], ['Ingresos', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['Margen EBIT', 'num'], ['Rotación', 'num'], ['Días CT', 'num'], ['Estado']], rkRows, { cards: true, caption: 'Ranking por sede' }));
+    add(rk, h('small', { text: 'Ingresos en US$. Rotación = ingresos / capital invertido. Días CT = capital de trabajo operativo neto / ingresos × 365.' }));
+    var rw = card('ROIC frente a WACC', 'La raya marca el costo de capital de cada sede');
+    add(rw, roicWaccChart(codes.slice().sort(function (a, b) { return (cos[b].roic || 0) - (cos[a].roic || 0); }).map(function (c) { return { name: countryName(c), code: c, roic: Number(cos[c].roic), wacc: Number(cos[c].wacc) }; })));
+    add(body, h('div', { class: 'dash-2 wide-left' }, rk, rw));
+
+    /* ---- oportunidades + proyectos ---- */
+    var oc = card('Oportunidades de mejora', 'Calculadas con reglas a partir de los indicadores, las propuestas y las desviaciones · ordenadas por efecto en EVA');
+    if (!opps.length) add(oc, empty('No hay oportunidades claras con las reglas actuales.', 'Todas las sedes están cerca del promedio del grupo.'));
+    else add(oc, h('div', { class: 'opps' }, opps.map(function (o) { return oppItem(o, key); })));
+    var pc = card('Proyectos de inversión', 'Decisión presentada por la sede frente a la recalculada');
+    add(pc, projectsTable(props, recalc));
+    add(body, h('div', { class: 'dash-2 wide-left' }, oc, pc));
+
+    if (caps().admin) add(body, meridiaCard());
+    add(body, h('p', { class: 'dash-foot', text: 'Datos ficticios de Grupo Meridia · ' + versionLabel(key) + (prov.length ? ' · cifras provisionales' : '') + (base ? ' · comparado con ' + bl : '') }));
+  }
+
+  /** Reglas de oportunidades: propuesta que no se sostiene, margen muy bajo, rotación más baja y efecto cambiario. */
+  function buildOpportunities(D, cos, G, atRisk) {
+    var out = [], codes = Object.keys(cos), gm = marginOf(G);
+    // 1. Propuestas cuya decisión no se sostiene.
+    atRisk.forEach(function (p) {
+      var cap = Number(p.capital_usd) || Number(p.investment_usd) || 0, nop = Number(p.nopat_usd) || 0;
+      var shortfall = Math.max(0, cap * ((Number(p.wacc) || 0) + 0.02) - nop), destroy = Number(p.eva) < 0 ? -Number(p.eva) : 0;
+      out.push({ site: p.site, kind: 'propuesta', chip: 'warn', icon: 'briefcase', reason: p.id + ' en riesgo', impact: Math.max(shortfall, destroy),
+        title: countryName(p.site) + ': no aprobar el proyecto ' + p.id + ' como está',
+        text: 'Se presentó con ROIC de ' + pct(p.roic_presented) + ' y decisión «' + p.decision_propuesta + '». Recalculado da ' + pct(p.roic) + ' frente a un WACC de ' + pct(p.wacc) +
+          ', así que la decisión que se sostiene es «' + p.decision_recalculada + '».' + (shortfall > 0 ? ' Le faltan ' + usdM(shortfall) + ' de NOPAT al año para llegar a «aprobar».' : ''),
+        effects: [[destroy ? 'Evita destruir ' + usdM(destroy) + ' al año' : 'EVA recalculado: ' + usdM(p.eva) + ' al año', 'bad'], ['Inversión en juego: ' + usdM(p.investment_usd), 'bad']] });
+    });
+    // 2. Sede con margen EBIT muy por debajo del grupo (menos del 60 % del margen del grupo).
+    var low = codes.filter(function (c) { var mg = marginOf(cos[c]); return isNum(mg) && isNum(gm) && mg < gm * 0.6; }).sort(function (a, b) { return marginOf(cos[a]) - marginOf(cos[b]); })[0];
+    if (low) {
+      var x = cos[low], mg = marginOf(x), target = (mg + gm) / 2, dE = (target - mg) * Number(x.revenue), dN = dE * (1 - (Number(x.tax) || 0));
+      var st = evaStreak(D.Hs, low);
+      out.push({ site: low, kind: 'margen', chip: 'bad', icon: 'percent', reason: 'Margen', impact: dN,
+        title: countryName(low) + ': margen EBIT de ' + pct(mg) + ' contra ' + pct(gm) + ' del grupo',
+        text: (Number(x.eva) < 0 ? 'Destruye valor: su ROIC de ' + pct(x.roic) + ' queda bajo su WACC de ' + pct(x.wacc) + (st.years >= 2 ? ' y lleva así desde ' + st.from : '') + '. ' : 'Su ROIC es ' + pct(x.roic) + ' frente a un WACC de ' + pct(x.wacc) + '. ') +
+          'Llevar su margen a mitad de camino del promedio del grupo mejora el resultado sin invertir más capital.',
+        effects: [['Margen a ' + pct(target) + ': ' + pts(dN / Number(x.ci) * 100) + ' de ROIC', 'ok'], [plus(dN, usdM(dN)) + ' de EVA al año', 'ok']] });
+    }
+    // 3. Sede con la rotación de capital más baja, si está por debajo del grupo.
+    var gRot = rotOf(G);
+    var lr = codes.filter(function (c) { return isNum(rotOf(cos[c])); }).sort(function (a, b) { return rotOf(cos[a]) - rotOf(cos[b]); })[0];
+    if (lr && isNum(gRot) && rotOf(cos[lr]) < gRot * 0.95) {
+      var y = cos[lr], rot = rotOf(y), ciNew = Number(y.revenue) / gRot, roicNew = Number(y.nopat) / ciNew, dEva = (Number(y.wacc) || 0) * (Number(y.ci) - ciNew);
+      var largest = codes.every(function (c) { return Number(cos[c].revenue) <= Number(y.revenue); });
+      var relW = Number(y.roic) < Number(y.wacc) ? 'queda bajo' : Number(y.roic) < Number(y.wacc) + 0.02 ? 'apenas supera' : 'supera';
+      out.push({ site: lr, kind: 'capital', chip: 'warn', icon: 'factory', reason: 'Capital', impact: dEva,
+        title: countryName(lr) + ': la rotación de capital más baja del grupo (' + times(rot) + ')',
+        text: (largest ? 'Es la sede con más ingresos, pero su' : 'Su') + ' activo fijo neto es ' + pct(Number(y.nfa) / Number(y.ci), 0) + ' de su capital invertido. Por eso su ROIC (' + pct(y.roic) + ') ' + relW + ' su WACC (' + pct(y.wacc) + ').',
+        effects: [['Rotación a ' + times(gRot) + ' (promedio del grupo): ' + pts((roicNew - Number(y.roic)) * 100) + ' de ROIC', 'ok'], [plus(dEva, usdM(dEva)) + ' de EVA al año', 'ok']] });
+    }
+    // 4. Sede con el mayor efecto negativo de tipo de cambio en las ventas frente a la base.
+    var V = D.V && D.V.companies ? obj(D.V.companies) : {};
+    var fx = Object.keys(V).filter(function (c) { var e = obj(V[c].effects).tipo_cambio; return isNum(e) && e < 0 && Math.abs(e) >= 0.01 * Math.abs(Number(V[c].b) || 0); })
+      .sort(function (a, b) { return V[a].effects.tipo_cambio - V[b].effects.tipo_cambio; })[0];
+    if (fx && cos[fx]) {
+      var v = V[fx], tc = Number(v.effects.tipo_cambio), b0 = Number(v.b) || 0, z = cos[fx], cur = curOf(fx);
+      var lg = b0 ? (Number(v.delta) - tc) / b0 : null, ug = b0 ? Number(v.delta) / b0 : null;
+      var ra = avgRate(D.RA, cur), rb = avgRate(D.RB, cur);
+      out.push({ site: fx, kind: 'fx', chip: 'warn', icon: 'swap', reason: 'Tipo de cambio', impact: Math.abs(tc) * (marginOf(z) || 0) * (1 - (Number(z.tax) || 0)),
+        title: countryName(fx) + ': el tipo de cambio le quita ' + usdM(-tc) + ' de ventas',
+        text: (isNum(lg) ? 'A tipo de cambio constante sus ventas ' + (lg >= 0 ? 'crecen ' : 'bajan ') + pct(Math.abs(lg)) + ', pero en dólares ' + (ug >= 0 ? 'crecen ' : 'caen ') + pct(Math.abs(ug)) : 'Sus ventas en dólares bajan') +
+          (ra && rb ? ' por la depreciación del ' + cur + ' (de ' + num(rb, 2) + ' a ' + num(ra, 2) + ' por dólar en promedio)' : '') + '.' + (Number(z.roic) >= Number(z.wacc) ? ' Su operación crea valor; el riesgo es cambiario.' : ''),
+        effects: [['Efecto cambiario: ' + signedUsdM(tc) + ' en ventas', 'bad']] });
+    }
+    return out.sort(function (a, b) { return (b.impact || 0) - (a.impact || 0); });
+  }
+  function oppItem(o, key) {
+    return h('article', { class: 'opp' },
+      h('span', { class: 'opp-ico t-' + o.chip, 'aria-hidden': 'true' }, icon(o.icon)),
+      h('div', { class: 'opp-b' }, h('h3', { text: o.title }), h('p', { text: o.text }),
+        h('p', { class: 'opp-fx' }, o.effects.map(function (e) { return h('span', { class: e[1] === 'ok' ? 'c-ok' : 'c-bad', text: e[0] }); }))),
+      caps().board ? btn('Crear plan de acción', function () {
+        actionForm(null, function () { toast('Plan de acción creado. Síguelo en «Acciones y seguimiento».', 'ok'); }, {
+          title: o.title, owner: ownerOf(o.site), due_date: today(30), version: key,
+          effect: o.effects.map(function (e) { return e[0]; }).join(' · ') + '. ' + o.text
+        }, 'Crear plan de acción');
+      }, 'primary small', {}, 'tasks') : null);
+  }
+  function projectsTable(props, recalc) {
+    if (!props.length) return empty('No hay propuestas de inversión.', 'Vienen del archivo corporativo.');
+    var box = h('div', { class: 'stack tight' });
+    add(box, table([['Proyecto'], ['Inversión', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['Decisión']], props.map(function (p) {
+      var dec = DECISION[recalc ? p.decision_recalculada : p.decision] || [(recalc ? p.decision_recalculada : p.decision) || '—', 'neutral'];
+      var roicCell;
+      if (recalc) {
+        var changed = isNum(p.roic_presented) && isNum(p.roic) && Math.abs(p.roic_presented - p.roic) >= 0.0005;
+        roicCell = h('span', {}, changed ? h('s', { class: 'muted', text: pct(p.roic_presented) }) : null, changed ? ' ' : null, h('b', { class: p.holds === false ? 'c-bad' : '', text: pct(p.roic) }));
+      } else roicCell = isNum(p.roic_pct) ? num(p.roic_pct, 1) + ' %' : '—';
+      var waccCell = recalc ? h('span', {}, p.wacc_ok === false ? h('s', { class: 'muted', text: pct(p.wacc_presented) }) : null, p.wacc_ok === false ? ' ' : null, h('span', { text: pct(p.wacc, 1) }))
+        : (isNum(p.wacc_pct) ? num(p.wacc_pct, 1) + ' %' : '—');
+      return h('tr', {}, h('th', { scope: 'row' }, h('b', { text: p.id + ' · ' + countryName(p.site) }), h('small', { text: p.description || '' })),
+        tdn(usdM(p.investment_usd)), tdn(roicCell), tdn(waccCell), td(tag(dec[0], dec[1])));
+    }), { cards: true, caption: 'Proyectos de inversión' }));
+    if (recalc) props.filter(function (p) { return p.holds === false; }).forEach(function (p) {
+      add(box, note('bad', 'alert', p.id + ' · ' + countryName(p.site), arr(p.reasons).join(' ') || ('Se presentó para «' + p.decision_propuesta + '» y recalculada da «' + p.decision_recalculada + '».')));
+    });
+    add(box, h('div', { class: 'acts' }, linkBtn('Ver detalle de las propuestas', '#/propuestas', 'ghost small', 'briefcase')));
+    return box;
+  }
+  /** Barras horizontales de EVA por sede (divergentes desde cero) + eliminaciones + grupo. */
+  function evaBars(rows, elim, group) {
+    var neg = 0, pos = 0;
+    rows.forEach(function (r) { if (r.v < 0) neg = Math.max(neg, -r.v); else pos = Math.max(pos, r.v); });
+    var span = (neg + pos) || 1, zero = neg / span * 100;
+    var list = h('ul', { class: 'evabars', 'aria-label': 'EVA por sede en millones de US$' });
+    rows.forEach(function (r) {
+      var w = Math.abs(r.v) / span * 100;
+      add(list, h('li', {}, h('span', { class: 'eb-l', text: r.label }),
+        h('span', { class: 'eb-t', 'aria-hidden': 'true' }, h('i', { class: 'eb-0', style: { left: zero + '%' } }), h('i', { class: 'eb-b ' + (r.v < 0 ? 'neg' : 'pos'), style: { left: (r.v < 0 ? zero - w : zero) + '%', width: Math.max(w, 0.5) + '%' } })),
+        h('b', { class: 'tnum ' + (r.v < 0 ? 'c-bad' : ''), text: millions(r.v) })));
+    });
+    add(list, h('li', { class: 'eb-elim' }, h('span', { class: 'eb-l', text: 'Eliminaciones y ajustes del grupo' }), h('span', { class: 'eb-t empty' }), h('b', { class: 'tnum muted', text: millions(elim) })));
+    add(list, h('li', { class: 'eb-total' }, h('span', { class: 'eb-l', text: 'Grupo' }), h('span', { class: 'eb-t empty' }), h('b', { class: 'tnum', text: millions(group) })));
+    return list;
+  }
+  function svgEl(tag_, at, text) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag_);
+    Object.keys(at || {}).forEach(function (k) { el.setAttribute(k, at[k]); });
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+  function ticks(lo, hi, n) {
+    var step = niceStep((hi - lo) / (n || 5) || 1), out = [];
+    for (var v = Math.floor(lo / step) * step; v <= hi + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6);
+    return out;
+  }
+  /** Burbujas: x = crecimiento de ingresos (%), y = ROIC − WACC (pts), tamaño = ingresos. */
+  function bubbleChart(items) {
+    var W = 560, H = 360, L = 50, R = 16, T = 16, B = 46;
+    var xs = items.map(function (i) { return i.x; }), ys = items.map(function (i) { return i.y; });
+    var xt = ticks(Math.min.apply(null, xs.concat([-2])) - 1.5, Math.max.apply(null, xs.concat([2])) + 1.5, 6);
+    var yt = ticks(Math.min.apply(null, ys.concat([-2])) - 1.5, Math.max.apply(null, ys.concat([2])) + 1.5, 5);
+    var x0 = xt[0], x1 = xt[xt.length - 1], y0 = yt[0], y1 = yt[yt.length - 1];
+    var X = function (v) { return L + (v - x0) / ((x1 - x0) || 1) * (W - L - R); }, Y = function (v) { return T + (1 - (v - y0) / ((y1 - y0) || 1)) * (H - T - B); };
+    var maxS = Math.max.apply(null, items.map(function (i) { return i.size; }).concat([1]));
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart bubbles', role: 'img',
+      'aria-label': 'Crecimiento frente a rentabilidad: ' + items.map(function (i) { return i.name + ' crece ' + num(i.x, 1) + ' % y su ROIC − WACC es ' + num(i.y, 1) + ' puntos'; }).join('; ') });
+    xt.forEach(function (v) { svg.appendChild(svgEl('line', { x1: X(v), x2: X(v), y1: T, y2: H - B, class: v === 0 ? 'axis0' : 'grid' })); svg.appendChild(svgEl('text', { x: X(v), y: H - B + 16, 'text-anchor': 'middle', class: 'tick' }, num(v, Math.abs(v) < 10 && v % 1 ? 1 : 0))); });
+    yt.forEach(function (v) { svg.appendChild(svgEl('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: v === 0 ? 'axis0' : 'grid' })); svg.appendChild(svgEl('text', { x: L - 8, y: Y(v) + 4, 'text-anchor': 'end', class: 'tick' }, num(v, v % 1 ? 1 : 0))); });
+    svg.appendChild(svgEl('text', { x: (L + W - R) / 2, y: H - 6, 'text-anchor': 'middle', class: 'tick' }, 'Crecimiento de ingresos en USD (%)'));
+    svg.appendChild(svgEl('text', { x: 12, y: (T + H - B) / 2, 'text-anchor': 'middle', class: 'tick', transform: 'rotate(-90 12 ' + (T + H - B) / 2 + ')' }, 'ROIC − WACC (pts)'));
+    items.slice().sort(function (a, b) { return b.size - a.size; }).forEach(function (it) {
+      var r = 7 + 20 * Math.sqrt(it.size / maxS), cx = X(it.x), cy = Y(it.y);
+      var c = svgEl('circle', { cx: cx, cy: cy, r: r.toFixed(1), class: 'bub ' + it.cls });
+      c.appendChild(svgEl('title', {}, it.name + ': crecimiento ' + num(it.x, 1) + ' %, ROIC − WACC ' + num(it.y, 1) + ' pts, ingresos ' + usdM(it.size)));
+      svg.appendChild(c);
+      var right = cx + r + 90 < W - R;
+      svg.appendChild(svgEl('text', { x: right ? cx + r + 5 : cx - r - 5, y: cy + 4, 'text-anchor': right ? 'start' : 'end', class: 'blbl' }, it.name));
+    });
+    [['Crece y crea valor', W - R - 6, T + 14, 'end'], ['Rentable sin crecer', L + 6, T + 14, 'start'], ['En problemas', L + 6, H - B - 8, 'start'], ['Crece destruyendo valor', W - R - 6, H - B - 8, 'end']]
+      .forEach(function (q) { svg.appendChild(svgEl('text', { x: q[1], y: q[2], 'text-anchor': q[3], class: 'quad' }, q[0])); });
+    return h('div', { class: 'chartwrap' }, svg);
+  }
+  /** Barras verticales de ROIC con una raya en el WACC de cada sede; roja si el ROIC queda bajo el WACC. */
+  function roicWaccChart(list) {
+    var W = 560, H = 300, L = 44, R = 12, T = 22, B = 40;
+    var mx = Math.max.apply(null, list.map(function (i) { return Math.max(i.roic || 0, i.wacc || 0); }).concat([0.05]));
+    var top = Math.ceil(mx * 100 / 5) * 5 / 100;
+    var Y = function (v) { return T + (1 - v / top) * (H - T - B); };
+    var slot = (W - L - R) / Math.max(1, list.length), bw = Math.min(56, slot * 0.55);
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart rw', role: 'img',
+      'aria-label': 'ROIC frente a WACC: ' + list.map(function (i) { return i.name + ' ROIC ' + pct(i.roic) + ', WACC ' + pct(i.wacc); }).join('; ') });
+    for (var v = 0; v <= top + 1e-9; v += 0.05) {
+      svg.appendChild(svgEl('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: v === 0 ? 'axis0' : 'grid' }));
+      svg.appendChild(svgEl('text', { x: L - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'tick' }, num(v * 100, 0) + ' %'));
+    }
+    list.forEach(function (it, i) {
+      var cx = L + slot * i + slot / 2, bad = it.roic < it.wacc;
+      var rect = svgEl('rect', { x: cx - bw / 2, y: Y(Math.max(0, it.roic)), width: bw, height: Math.max(1, Y(0) - Y(Math.max(0, it.roic))), rx: 3, class: bad ? 'bar-bad' : 'bar-ok' });
+      rect.appendChild(svgEl('title', {}, it.name + ': ROIC ' + pct(it.roic) + ' · WACC ' + pct(it.wacc)));
+      svg.appendChild(rect);
+      svg.appendChild(svgEl('line', { x1: cx - bw / 2 - 6, x2: cx + bw / 2 + 6, y1: Y(it.wacc), y2: Y(it.wacc), class: 'wacc-mark' }));
+      svg.appendChild(svgEl('text', { x: cx, y: Y(Math.max(it.roic, it.wacc)) - 6, 'text-anchor': 'middle', class: 'blbl' + (bad ? ' bad' : '') }, pct(it.roic)));
+      svg.appendChild(svgEl('text', { x: cx, y: H - B + 16, 'text-anchor': 'middle', class: 'tick' }, it.name.length > 11 ? it.code : it.name));
+    });
+    return h('div', { class: 'stack tight' }, h('div', { class: 'chartwrap' }, svg),
+      h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'sw ok' }), ' ROIC'), h('span', {}, h('i', { class: 'sw bad' }), ' ROIC bajo el WACC'), h('span', {}, h('i', { class: 'sw line' }), ' WACC de la sede')));
+  }
+
   function homeNoData() {
     var c = caps();
     var cd = card('Aún no hay datos', null);
@@ -793,13 +1156,7 @@
         compare ? h('small', { class: 'tnum', text: 'prom. ' + num(compare[k], 1) }) : null);
     }));
   }
-  function homeBoard(H) {
-    var cd = card('Resumen para la directiva', H.lastResult ? 'Consolidado el ' + dt(H.lastResult.created_at) : null);
-    if (!H.lastResult) add(cd, empty('El corporativo aún no consolida ' + versionLabel(VERSION) + '.', 'Cuando lo haga, aquí verás el resumen de una página con los indicadores del grupo.'));
-    else add(cd, [h('p', { text: 'Indicadores del grupo, semáforo por país, las 3 desviaciones más grandes y la decisión sugerida en una sola página.' }),
-      h('div', { class: 'acts' }, linkBtn('Abrir resumen', '#/resumen', 'primary', 'doc'), linkBtn('Indicadores', '#/indicadores', 'ghost'), linkBtn('Acciones', '#/acciones', 'ghost'))]);
-    return cd;
-  }
+
 
   /* =====================================================================
      2 · Cargar Excel
@@ -1368,8 +1725,8 @@
   function icCard(ic, key) {
     var pairs = arr(ic.pairs);
     var cd = card('Conciliación intercompañía', 'Lo que un país le vende, cobra o presta a otro debe coincidir con lo que el otro reporta, mes a mes (tolerancia 0.5 %).');
-    if (arr(ic.missing).length) add(cd, note('info', 'info', null, 'Solo se concilian los países que ya enviaron. Faltan: ' + arr(ic.missing).map(coShort).join(', ') + '.'));
-    if (!pairs.length) { add(cd, empty('No hay operaciones intercompañía para conciliar.', 'Aparecen cuando los países envían sus archivos.')); return cd; }
+    if (arr(ic.missing).length) add(cd, note('info', 'info', null, 'Se concilian los archivos vigentes de cada país (enviados o no). Sin archivo: ' + arr(ic.missing).map(coShort).join(', ') + '.'));
+    if (!pairs.length) { add(cd, empty('No hay operaciones intercompañía para conciliar.', 'Aparecen cuando los países suben sus archivos.')); return cd; }
     var countBy = {};
     pairs.forEach(function (p) { countBy[p.status] = (countBy[p.status] || 0) + 1; });
     add(cd, h('div', { class: 'legend' }, Object.keys(PAIR_ST).map(function (k) { return countBy[k] ? tag(PAIR_ST[k][0] + ': ' + countBy[k], PAIR_ST[k][1]) : null; })));
@@ -1424,7 +1781,8 @@
   function elimSummary(E) {
     var g = {}, order = [];
     E.forEach(function (e) {
-      var bal = e.type === 'saldo' || e.type === 'prestamo';
+      // Saldos, préstamos y margen no realizado en inventario son saldos: se toman a diciembre, no se suman.
+      var bal = e.type === 'saldo' || e.type === 'prestamo' || e.type === 'margen_inventario';
       if (bal && Number(e.month) !== 12) return;
       var k = [e.type, e.from || '', e.to || '', e.line || ''].join('|');
       if (!g[k]) { g[k] = { type: e.type, from: e.from, to: e.to, line: e.line, usd: 0, n: 0, diff: 0, accounts: {}, bal: bal }; order.push(k); }
@@ -1448,7 +1806,7 @@
       kpi('Eliminado', usdM(elimTotal), null, num(E.length) + ' eliminación(es) mensuales'),
       kpi('IC sin conciliar', usdM(R.ic_unreconciled), Number(R.ic_unreconciled) >= 1 ? 'warn' : 'ok', Number(R.ic_unreconciled) >= 1 ? 'Diferencia que queda en el total' : 'Todo conciliado')
     ]));
-    var el = card('Eliminaciones intercompañía', 'Agrupadas por tipo y pareja. Flujos: suma de los 12 meses; saldos y préstamos: a diciembre.');
+    var el = card('Eliminaciones intercompañía', 'Agrupadas por tipo y pareja. Flujos: suma de los 12 meses; saldos, préstamos y margen en inventario: a diciembre.');
     add(el, sum.length ? paged(sum, 12, function (part) { return table([['Tipo'], ['De → a'], ['Línea'], ['Meses', 'num'], ['US$', 'num'], ['Diferencia US$', 'num'], ['Cuentas afectadas']], part.map(function (x) {
       var accs = Object.keys(x.accounts).map(function (a) { return accLabel(a) + ': ' + usd(x.accounts[a]); }).join(' · ');
       return h('tr', {}, td(IC_TYPE[x.type] || x.type), td(x.from || x.to ? h('b', { text: (x.from ? coShort(x.from) : '—') + ' → ' + (x.to ? coShort(x.to) : '—') }) : '—'), td(x.line || '—'),
@@ -2455,7 +2813,7 @@
     if (k === 'empresas') k = 'reglas';
     window.scrollTo(0, 0);
     var views = {
-      inicio: [viewHome, true],
+      inicio: [function () { viewHome(p[1]); }, true],
       carga: [function () { viewUpload(p[1], p[2]); }, c.country || c.corp],
       validacion: [function () { viewValidation(p[1]); }, !!p[1]],
       enviar: [function () { viewSend(p[1]); }, !!p[1]],
@@ -2475,7 +2833,7 @@
   }
 
   function boot() {
-    clear(app).appendChild(h('p', { class: 'boot', role: 'status', text: 'Cargando Consolida…' }));
+    clear(app).appendChild(h('p', { class: 'boot', role: 'status', text: 'Cargando Trazo…' }));
     Promise.all([api('/me'), api('/meta')]).then(function (r) {
       ME = r[0] || {}; ME.caps = ME.caps || {}; ME.companies = ME.companies || [];
       META = normMeta(r[1]);

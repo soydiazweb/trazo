@@ -2,8 +2,8 @@
 namespace Consolida;
 
 /**
- * Sirve el panel en /consolida/ fuera del tema: una página mínima con <div id="csl-app"> que carga
- * assets/panel.css y assets/panel.js (§16). Sin sesión → login de WordPress con regreso a /consolida/.
+ * Sirve el panel en /trazo/ fuera del tema: una página mínima con <div id="csl-app"> que carga
+ * assets/panel.css y assets/panel.js (§16). Sin sesión → login de WordPress con regreso a /trazo/.
  */
 class Front {
 	public static function register(): void {
@@ -20,6 +20,8 @@ class Front {
 	}
 
 	public static function rewrites(): void {
+		// Marca Trazo: el panel vive en /trazo/; /consolida/ queda como alias de la primera versión.
+		add_rewrite_rule( '^trazo/?$', 'index.php?csl_app=panel', 'top' );
 		add_rewrite_rule( '^consolida/?$', 'index.php?csl_app=panel', 'top' );
 	}
 
@@ -40,7 +42,7 @@ class Front {
 			exit;
 		}
 		if ( ! current_user_can( Roles::CAP_ACCESS ) ) {
-			wp_die( 'Tu cuenta no tiene acceso a Consolida. Pide acceso al administrador.', 'Sin acceso', array( 'response' => 403 ) );
+			wp_die( 'Tu cuenta no tiene acceso a Trazo. Pide acceso al administrador.', 'Sin acceso', array( 'response' => 403 ) );
 		}
 		self::render();
 	}
@@ -81,9 +83,9 @@ class Front {
 		echo '<!doctype html><html lang="es"><head><meta charset="utf-8">';
 		echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
 		echo '<meta name="robots" content="noindex,nofollow">';
-		echo '<title>Consolida</title>';
+		echo '<title>Trazo</title>';
 		echo '<link rel="stylesheet" href="' . esc_url( $css ) . '">';
-		echo '</head><body><div id="csl-app"><p class="boot">Cargando Consolida…</p></div>';
+		echo '</head><body><div id="csl-app"><p class="boot">Cargando Trazo…</p></div>';
 		echo '<script nonce="' . esc_attr( $nonce ) . '">window.CSL=' . wp_json_encode( self::boot(), JSON_HEX_TAG | JSON_HEX_AMP ) . ';</script>';
 		echo '<script src="' . esc_url( $js ) . '" defer></script>';
 		echo '</body></html>';

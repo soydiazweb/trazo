@@ -65,7 +65,9 @@ class Group extends Base {
 		if ( is_wp_error( $v ) ) {
 			return $v;
 		}
-		[ $datasets ] = Store::datasets( $v['key'], self::bool( $r, 'all' ) ? null : array( 'enviado' ) );
+		// Se concilian los archivos vigentes de cada país aunque aún no se envíen: así el corporativo ve las
+		// diferencias intercompañía antes de consolidar. `sent=1` limita a los enviados.
+		[ $datasets ] = Store::datasets( $v['key'], self::bool( $r, 'sent' ) ? array( 'enviado' ) : null );
 		$known        = array_values( array_filter( Store::version_issues( $v['key'], false ), fn( $i ) => null !== $i['upload_id'] ) );
 		$out          = self::engine( fn() => EngineBridge::reconcile( $datasets, Store::corporate(), $v['key'], $known ), 'No se pudo conciliar la intercompañía.' );
 		if ( is_wp_error( $out ) ) {

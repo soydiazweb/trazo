@@ -9,7 +9,7 @@ namespace Consolida;
  * - csl_directiva:   csl_access, csl_board.
  * - administrator:   todas (csl_access, csl_corp, csl_board, csl_country, csl_admin).
  *
- * Los roles del plugin entran solo a /consolida/: tras el login van ahí y no pueden abrir wp-admin.
+ * Los roles del plugin entran solo a /trazo/: tras el login van ahí y no pueden abrir wp-admin.
  */
 class Roles {
 	const CAP_ACCESS  = 'csl_access';
@@ -19,9 +19,9 @@ class Roles {
 	const CAP_ADMIN   = 'csl_admin';
 
 	const ROLES = array(
-		'csl_corporativo' => array( 'Consolida · Corporativo', array( 'csl_access', 'csl_corp', 'csl_board' ) ),
-		'csl_pais'        => array( 'Consolida · País', array( 'csl_access', 'csl_country' ) ),
-		'csl_directiva'   => array( 'Consolida · Directiva', array( 'csl_access', 'csl_board' ) ),
+		'csl_corporativo' => array( 'Trazo · Corporativo', array( 'csl_access', 'csl_corp', 'csl_board' ) ),
+		'csl_pais'        => array( 'Trazo · País', array( 'csl_access', 'csl_country' ) ),
+		'csl_directiva'   => array( 'Trazo · Directiva', array( 'csl_access', 'csl_board' ) ),
 	);
 
 	public static function install(): void {
@@ -58,7 +58,7 @@ class Roles {
 	}
 
 	public static function panel_url(): string {
-		return home_url( '/consolida/' );
+		return home_url( '/trazo/' );
 	}
 
 	/** Usuario con un rol del plugin que no administra el sitio. */

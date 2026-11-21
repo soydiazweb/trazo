@@ -1,6 +1,6 @@
-# Consolida – Consolidación multiempresa (plugin de WordPress)
+# Trazo – Consolidación multiempresa (plugin de WordPress)
 
-Panel privado en `/consolida/` que consolida el presupuesto del Grupo Meridia desde el Excel de cada país.
+Panel privado en `/trazo/` que consolida el presupuesto del Grupo Meridia desde el Excel de cada país.
 Documento completo de la solución: [`../SOLUCION.md`](../SOLUCION.md). Contrato técnico: [`../CONTRACT.md`](../CONTRACT.md).
 
 - Autor: Jonathan Diaz · https://www.soydiaz.com · SolucionWeb
@@ -11,7 +11,7 @@ Documento completo de la solución: [`../SOLUCION.md`](../SOLUCION.md). Contrato
 
 1. Subir la carpeta `consolida/` a `wp-content/plugins/` y activar el plugin.
 2. Copiar los datos del reto a `wp-content/datos-meridia/` (`1_Paises/…` y `2_Grupo/Grupo_Corporativo.xlsx`).
-3. Entrar a `/consolida/` como administrador → Inicio → **Importar datos de Meridia** (importa el corporativo, carga
+3. Entrar a `/trazo/` como administrador → Inicio → **Importar datos de Meridia** (importa el corporativo, carga
    los 20 archivos por el flujo normal de subida y envía los que no tienen críticos).
 4. Opcional: crear usuarios de prueba por rol desde la misma carga.
 
@@ -30,7 +30,7 @@ Documento completo de la solución: [`../SOLUCION.md`](../SOLUCION.md). Contrato
 consolida.php            Arranque, autoload, módulos, activación
 includes/
   Schema.php             Tablas wp_csl_* (dbDelta) y migraciones
-  Roles.php · Front.php  Roles y capacidades · página /consolida/ con CSP y nonce REST
+  Roles.php · Front.php  Roles y capacidades · página /trazo/ con CSP (alias /consolida/) y nonce REST
   Store.php · Log.php    Persistencia · bitácora
   Demo.php               Importación de datos-meridia/ y reinicio
   EngineBridge.php       Único punto de contacto entre WordPress y el motor
