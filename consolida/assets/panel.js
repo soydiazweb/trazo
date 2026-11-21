@@ -1323,7 +1323,8 @@
       if (Number(cos[worst].eva) < 0) act('Plan para ' + countryName(worst), 'Recuperar el ROIC de ' + countryName(worst) + ' por encima de su WACC', ownerOf(worst), 'EVA actual ' + usdM(cos[worst].eva));
     } else if (tab === 'consolidacion') {
       var prov = arr(D.S && D.S.provisional), crit = D.F && D.F.counts ? D.F.counts.critical : 0, ic = D.F && D.F.counts ? obj(D.F.counts.by_category).intercompania || 0 : 0;
-      pts.push(prov.length ? 'Consolidación provisional: incluye errores abiertos de ' + prov.map(countryName).join(', ') + '.' : 'Consolidación definitiva: los 5 países enviaron sus archivos.');
+      var miss = arr(D.S && D.S.missing);
+      pts.push(miss.length ? 'Consolidación incompleta: faltan ' + miss.map(countryName).join(', ') + ', que aún no envían su archivo.' : prov.length ? 'Consolidación provisional: incluye errores abiertos de ' + prov.map(countryName).join(', ') + '.' : 'Consolidación definitiva: todos los países enviaron sus archivos.');
       pts.push(num(crit) + ' errores críticos abiertos; ' + num(ic) + ' diferencias de intercompañía entre países.');
       if (ic) act('Conciliar intercompañía', 'Conciliar las diferencias intercompañía entre países', 'Finanzas del grupo', num(ic) + ' diferencias por resolver');
       if (crit) act('Pedir correcciones a los países', 'Corregir los errores críticos de los archivos de los países', 'Responsables de datos', num(crit) + ' errores críticos');
@@ -1333,7 +1334,7 @@
         pts.push(V.text || ('Las ventas cambian ' + signedUsdM(V.delta) + ' frente a ' + versionLabel(D.base) + '.'));
         var ef = obj(V.effects), fx = Number(ef.tipo_cambio) || 0;
         if (fx < 0) { pts.push('El tipo de cambio resta ' + usdM(Math.abs(fx)) + ' a las ventas en dólares.'); act('Cubrir el tipo de cambio', 'Definir cobertura cambiaria y pactar ventas internas en USD', 'Finanzas del grupo', 'Efecto cambiario ' + signedUsdM(fx)); }
-      } else pts.push('Elige una versión base consolidada para comparar.');
+      } else pts.push('Para ver desviaciones hacen falta dos versiones consolidadas; hoy no hay una base para comparar con ' + versionLabel(key) + '.');
     } else if (tab === 'proyectos') {
       var risk = arr(D.P && D.P.items).filter(function (p) { return p.decision_recalculada && p.decision_propuesta !== p.decision_recalculada; });
       pts.push(num(arr(D.P && D.P.items).length) + ' propuestas revisadas; ' + num(risk.length) + ' no se sostienen con las reglas del grupo.');
@@ -1349,7 +1350,7 @@
       pts.push('Aquí se siguen las acciones creadas desde cada pestaña: responsable, fecha y estado.');
     }
     if (!pts.length) return null;
-    var cd = card('Conclusión para el corporativo', versionLabel(key) + (D.base ? ' · comparado con ' + versionLabel(D.base) : ''));
+    var cd = card('Conclusión', versionLabel(key) + (D.base && D.KB ? ' · comparado con ' + versionLabel(D.base) : ''));
     cd.classList.add('brief');
     add(cd, h('ul', { class: 'brief-l' }, pts.map(function (t) { return h('li', { text: t }); })));
     if (acts.length) add(cd, h('div', { class: 'acts' }, acts));
@@ -1361,7 +1362,7 @@
     var m = page('analisis');
     if (!VERSION) { noVersion(m, 'Análisis'); return; }
     var label = (ANALYSIS_TABS.filter(function (t) { return t[0] === tab; })[0] || [0, ''])[1];
-    add(m, header(versionLabel(VERSION), 'Análisis', 'El detalle para quien quiera profundizar: elige un tema.'));
+    add(m, header(null, 'Análisis', null));
     var tabs = h('nav', { class: 'tabs', 'aria-label': 'Temas del análisis' }, ANALYSIS_TABS.filter(function (t) { return t[0] !== 'consolidacion' || caps().corp; }).map(function (t) {
       return h('a', { href: '#/analisis/' + t[0], class: t[0] === tab ? 'on' : null, 'aria-current': t[0] === tab ? 'page' : null, text: t[1] });
     }));
@@ -1441,7 +1442,11 @@
       if (m[1] === 'ppto') cand.push('real_' + (y - 1));
       if (m[1] === 'real') { cand.push('ppto_' + y); for (var i = 9; i >= 1; i--) cand.push('ppto_' + y + '_v' + i); }
     }
-    for (var j = 0; j < cand.length; j++) if (versionByKey(cand[j])) return cand[j];
+    var ok = function (k) { var v = versionByKey(k); return !!v && v.has_result !== false; };
+    for (var j = 0; j < cand.length; j++) if (ok(cand[j])) return cand[j];
+    // Si la base natural no está consolidada, se compara con la versión consolidada más reciente.
+    var doneV = META.versions.filter(function (v) { return v.key !== key && v.has_result; })[0];
+    if (doneV) return doneV.key;
     var keys = META.versions.map(function (v) { return v.key; }), idx = keys.indexOf(key); // versiones de la más reciente a la más antigua
     return idx >= 0 && keys[idx + 1] ? keys[idx + 1] : null;
   }
@@ -2175,8 +2180,8 @@
     var m = page('consolidar');
     if (!VERSION) { noVersion(m, 'Consolidar'); return; }
     var key = VERSION;
-    var cbtn = btn('Consolidar', null, 'primary', { disabled: true }, 'layers');
-    add(m, header(versionLabel(key), 'Consolidación', 'Une los países en US$ mes a mes, elimina lo que se venden y prestan entre ellos y calcula minoritarios. Toca cualquier cifra para ver de qué archivo, hoja y celda sale.', cbtn));
+    var cbtn = btn('Consolidar de nuevo', null, 'ghost', { disabled: true }, 'layers');
+    add(m, header(null, 'Consolidación', 'Convierte las cifras de cada país a US$, las suma y quita lo que los países se venden, cobran y prestan entre ellos, para no contarlo dos veces. Toca cualquier cifra para ver de qué archivo, hoja y celda sale.', cbtn));
     var body = skel(4); add(m, body);
     var load = function () {
       Promise.all([api('/home' + qs({ version: key })), api('/ic' + qs({ version: key })).catch(function (e) { return { _error: e }; }), api('/rates' + qs({ version: key })).catch(function () { return null; }), maybe(api('/results/latest' + qs({ version: key })))]).then(function (r) {
@@ -2189,23 +2194,39 @@
         var allSent = cos.length && sent.length === cos.length;
         cbtn.disabled = false;
         cbtn.onclick = function () { consolidate(cbtn, key, allSent, ratesOk, cos.filter(function (x) { return !(x.upload && x.upload.status === 'enviado'); }).map(function (x) { return x.code; }), load); };
-        var rd = card('Estado de los países', null);
+        var R = res && res.result, hasRes = !!(res && R && arr(R.lines).length);
+        if (hasRes) { var bc = bridgeCard(R, res); if (bc) add(body, bc); }
+        var rd = card('¿Se puede cerrar?', null);
         add(rd, h('ul', { class: 'checklist' }, [
-          h('li', {}, tag(allSent ? 'Listo' : 'Falta', allSent ? 'ok' : 'warn'), h('span', { text: num(sent.length) + ' de ' + num(cos.length) + ' países enviados' })),
-          h('li', {}, tag(ratesOk ? 'Listo' : 'Falta', ratesOk ? 'ok' : 'bad'), h('span', { text: ratesOk ? 'Tasas oficiales de los 12 meses aprobadas' : 'Faltan tasas oficiales aprobadas' + (missingRates.length ? ' de ' + missingRates.join(', ') : '') + ' (obligatorio para consolidar)' }), !ratesOk && caps().corp ? linkBtn('Editar tasas', '#/reglas', 'link') : null),
-          h('li', {}, tag(okPairs === pairs.length ? 'Listo' : 'Revisar', okPairs === pairs.length ? 'ok' : 'warn'), h('span', { text: num(okPairs) + ' de ' + num(pairs.length) + ' operaciones intercompañía cuadran (por mes y tipo)' }))
+          h('li', {}, tag(allSent ? 'Listo' : 'Falta', allSent ? 'ok' : 'warn'), h('span', { text: num(sent.length) + ' de ' + num(cos.length) + ' países enviaron su archivo' })),
+          h('li', {}, tag(ratesOk ? 'Listo' : 'Falta', ratesOk ? 'ok' : 'bad'), h('span', { text: ratesOk ? 'Tasas de cambio oficiales de los 12 meses aprobadas' : 'Faltan tasas oficiales aprobadas' + (missingRates.length ? ' de ' + missingRates.join(', ') : '') + ' (obligatorio para consolidar)' }), !ratesOk && caps().corp ? linkBtn('Editar tasas', '#/reglas', 'link') : null),
+          h('li', {}, tag(okPairs === pairs.length ? 'Listo' : 'Revisar', okPairs === pairs.length ? 'ok' : 'warn'), h('span', { text: num(okPairs) + ' de ' + num(pairs.length) + ' operaciones entre países cuadran' + (pairs.length - okPairs ? '; las ' + num(pairs.length - okPairs) + ' que no, están abajo' : '') }))
         ]));
-        add(rd, coGrid(cos, function (co) { return co.upload ? linkBtn(co.upload.status === 'enviado' ? 'Ver revisión' : 'Revisar', '#/proceso/' + co.code, 'ghost small') : linkBtn('Cargar Excel', '#/proceso/' + co.code, 'ghost small', 'upload'); }));
+        add(rd, h('details', { class: 'more' }, h('summary', { text: 'Ver el estado de cada país' }), coGrid(cos, function (co) { return co.upload ? linkBtn(co.upload.status === 'enviado' ? 'Ver revisión' : 'Revisar', '#/proceso/' + co.code, 'ghost small') : linkBtn('Cargar Excel', '#/proceso/' + co.code, 'ghost small', 'upload'); })));
         add(body, rd);
-        add(body, ic._error ? card('Conciliación intercompañía').appendChild(errorStateBox(ic._error)).parentNode : icCard(ic, key));
-        var R = res && res.result;
-        if (res && R && arr(R.lines).length) { add(body, resultBlock(res, key)); add(body, h('div', { class: 'acts next-bar' }, linkBtn('Ver el resultado del grupo', '#/inicio', 'primary', 'arrowRight'))); }
-        else add(body, card('Resultado', null).appendChild(empty('Aún no se consolida esta versión.', 'Cuando estén los requisitos, usa el botón Consolidar de arriba.')).parentNode);
+        add(body, ic._error ? card('Operaciones entre países').appendChild(errorStateBox(ic._error)).parentNode : icCard(ic, key));
+        if (hasRes) { add(body, resultBlock(res, key)); add(body, h('div', { class: 'acts next-bar' }, linkBtn('Ver el resultado del grupo', '#/inicio', 'primary', 'arrowRight'))); }
+        else add(body, card('Resultado', null).appendChild(empty('Aún no se consolida esta versión.', 'Cuando estén los requisitos, usa el botón de arriba.')).parentNode);
       }, function (e) { errorState(body, e, load); });
     };
     load();
   }
-  function errorStateBox(e) { var b = h('div'); errorState(b, e, null); return b; }
+  /** Puente de ventas: suma de los países en US$ − ventas entre empresas del grupo = ventas del grupo. */
+  function bridgeCard(R, res) {
+    var ls = arr(R.lines).filter(function (l) { return l.statement === 'PL' && /^4/.test(String(l.account)); });
+    if (!ls.length) return null;
+    var sumCo = 0, tot = 0;
+    ls.forEach(function (l) { Object.keys(obj(l.by_company)).forEach(function (c) { sumCo += Number(l.by_company[c]) || 0; }); tot += Number(l.total) || 0; });
+    sumCo = Math.abs(sumCo); tot = Math.abs(tot);
+    var cd = card('Cómo se llega a las ventas del grupo', 'Año completo, en US$' + (arr(res.provisional).length ? '. Provisional: hay países con errores abiertos.' : '.'));
+    add(cd, h('div', { class: 'bridge' },
+      h('div', { class: 'bstep' }, h('small', { text: 'Suma de los países' }), h('b', { text: usdM(sumCo) }), h('span', { text: 'Ventas de cada país convertidas a US$' })),
+      h('div', { class: 'op', 'aria-hidden': 'true', text: '−' }),
+      h('div', { class: 'bstep' }, h('small', { text: 'Ventas entre empresas del grupo' }), h('b', { text: usdM(sumCo - tot) }), h('span', { text: 'Lo que un país le vende o cobra a otro del grupo' })),
+      h('div', { class: 'op', 'aria-hidden': 'true', text: '=' }),
+      h('div', { class: 'bstep res' }, h('small', { text: 'Ventas del grupo' }), h('b', { text: usdM(tot) }), h('span', { text: 'Lo que el grupo le vende a clientes de fuera' }))));
+    return cd;
+  }  function errorStateBox(e) { var b = h('div'); errorState(b, e, null); return b; }
   function consolidate(b, key, allSent, ratesOk, missing, reload) {
     if (!ratesOk) { toast('Primero aprueba las tasas de los 12 meses en Reglas y tasas.', 'bad'); return; }
     var run = function (force, btnEl) {
@@ -2224,7 +2245,7 @@
   function srcText(code, s) { return s ? coShort(code) + ': ' + (s.sheet || '') + ' ' + cell(s.col, s.row) : coShort(code) + ': sin registro'; }
   function icCard(ic, key) {
     var pairs = arr(ic.pairs);
-    var cd = card('Conciliación intercompañía', 'Lo que un país le vende, cobra o presta a otro debe coincidir con lo que el otro reporta, mes a mes (tolerancia 0.5 %).');
+    var cd = card('Operaciones entre países', 'Lo que un país le vende, cobra o presta a otro debe coincidir con lo que el otro reporta, mes a mes (tolerancia 0.5 %). Se muestran las que tienen diferencia; el filtro Estado muestra el resto.');
     if (arr(ic.missing).length) add(cd, note('info', 'info', null, 'Se concilian los archivos vigentes de cada país (enviados o no). Sin archivo: ' + arr(ic.missing).map(coShort).join(', ') + '.'));
     if (!pairs.length) { add(cd, empty('No hay operaciones intercompañía para conciliar.', 'Aparecen cuando los países suben sus archivos.')); return cd; }
     var countBy = {};
@@ -2233,14 +2254,18 @@
     var fSt = select([['problemas', 'Con diferencia'], ['', 'Todas']].concat(Object.keys(PAIR_ST).map(function (k) { return [k, PAIR_ST[k][0]]; })), 'problemas');
     var fT = select([['', 'Todos']].concat(Object.keys(IC_TYPE).slice(0, 4).map(function (k) { return [k, IC_TYPE[k]]; })), '');
     var fC = companySelect('', 'Todos');
+    var monthsIn = [];
+    pairs.forEach(function (p) { if (isNum(p.month) && monthsIn.indexOf(Number(p.month)) < 0) monthsIn.push(Number(p.month)); });
+    monthsIn.sort(function (x, y) { return x - y; });
+    var fM = select([['', 'Todos']].concat(monthsIn.map(function (mm) { return [String(mm), monthName(mm)]; })), '');
     var holder = h('div');
     var draw = function () {
       var list = pairs.filter(function (p) {
-        return (fSt.value === '' || (fSt.value === 'problemas' ? p.status !== 'cuadra' : p.status === fSt.value)) && (!fT.value || p.type === fT.value) && (!fC.value || p.from === fC.value || p.to === fC.value);
+        return (fSt.value === '' || (fSt.value === 'problemas' ? p.status !== 'cuadra' : p.status === fSt.value)) && (!fT.value || p.type === fT.value) && (!fC.value || p.from === fC.value || p.to === fC.value) && (!fM.value || String(p.month) === fM.value);
       });
       clear(holder);
       if (!list.length) { add(holder, empty(fSt.value === 'problemas' ? 'Todas las operaciones cuadran.' : 'Nada con estos filtros.', null)); return; }
-      add(holder, paged(list, 60, function (part) {
+      add(holder, paged(list, 15, function (part) {
         return table([['Mes'], ['Tipo'], ['De → a'], ['Moneda'], ['Monto origen', 'num'], ['Monto destino', 'num'], ['Diferencia US$', 'num'], ['Estado'], ['Celdas del Excel'], ['']], part.map(function (p) {
           var st = PAIR_ST[p.status] || [p.status, 'neutral'];
           return h('tr', {}, td(monthName(p.month)), td(h('div', {}, h('span', { text: IC_TYPE[p.type] || p.type }), p.line ? h('small', { text: p.line }) : null)),
@@ -2251,8 +2276,8 @@
         }), { cards: true, caption: 'Operaciones intercompañía' });
       }));
     };
-    [fSt, fT, fC].forEach(function (s) { s.onchange = draw; });
-    add(cd, [h('div', { class: 'filters' }, field('Estado', fSt), field('Tipo', fT), field('País', fC)), holder]);
+    [fSt, fT, fC, fM].forEach(function (s) { s.onchange = draw; });
+    add(cd, [h('div', { class: 'filters' }, field('Mes', fM), field('Estado', fSt), field('Tipo', fT), field('País', fC)), holder]);
     draw();
     var tie = arr(ic.pl_tie).filter(function (x) { return !x.ok; }), bal = arr(ic.balances).filter(function (x) { return !x.ok; });
     if (tie.length || bal.length) {
@@ -2442,12 +2467,12 @@
     var m = page('desviaciones');
     if (!META.versions.length) { noVersion(m, 'Desviaciones'); return; }
     a = a && versionByKey(a) ? a : VERSION;
-    b = b && b !== '-' && versionByKey(b) ? b : '';
+    b = b && b !== '-' && versionByKey(b) ? b : (baseFor(a) || '');
     co = co && co !== '-' ? co : null;
-    add(m, header('Grupo', 'Desviaciones', 'Por qué cambian las ventas entre dos versiones: volumen, precio, tipo de cambio, intercompañía y otros. Baja de grupo a país, a cuenta, a mes y a la celda del Excel.'));
+    add(m, header(null, 'Desviaciones', 'Por qué cambian las ventas entre dos versiones: volumen, precio, tipo de cambio, ventas entre países y otros. Toca un país o una cuenta para bajar hasta el mes y la celda del Excel.'));
     var sa = versionSelect(a), sb = versionSelect(b, {}, 'Base sugerida');
     var go = function () { location.hash = '#/analisis/desviaciones/' + sa.value + '/' + (sb.value || '-'); };
-    add(m, h('div', { class: 'card' }, h('div', { class: 'form-row' }, field('Versión comparada (A)', sa), field('Base (B)', sb, 'Sugerida: v2 vs v1, presupuesto vs real anterior, real vs presupuesto.'), btn('Comparar', go, 'primary'))));
+    add(m, h('div', { class: 'card' }, h('div', { class: 'form-row' }, field('Versión comparada (A)', sa), field('Base (B)', sb), btn('Comparar', go, 'primary')), h('small', { class: 'muted', text: 'Base sugerida: v2 contra v1, presupuesto contra el real del año anterior, real contra presupuesto. Solo se pueden comparar versiones consolidadas.' })));
     if (a === b) { add(m, note('warn', 'alert', 'Elige dos versiones distintas', 'A y B son la misma versión.')); return; }
     var crumbsBox = h('nav', { 'aria-label': 'Nivel de detalle' });
     add(m, crumbsBox);
@@ -2471,7 +2496,7 @@
         else if (co) varCompany(body, V, ctx, co);
         else varGroup(body, V, ctx);
       }, function (e) {
-        if (e.status === 404) { ready(body); add(body, empty('Falta consolidar una de las dos versiones.', e.message, caps().corp ? linkBtn('Ir a Consolidación', '#/analisis/consolidacion', 'primary') : null)); return; }
+        if (e.status === 404) { var cons = META.versions.filter(function (v) { return v.has_result; }).map(function (v) { return v.label; }); ready(body); add(body, empty('Para comparar hacen falta dos versiones consolidadas', cons.length ? 'Hoy solo está consolidada: ' + cons.join(', ') + '. Elige como base otra versión consolidada o consolida una más.' : e.message, caps().corp ? linkBtn('Ir a Consolidación', '#/analisis/consolidacion', 'primary') : null)); return; }
         errorState(body, e, load);
       });
     };
@@ -2634,7 +2659,7 @@
   function viewKpi() {
     var m = page('indicadores');
     if (!VERSION) { noVersion(m, 'Indicadores'); return; }
-    add(m, header(versionLabel(VERSION), 'Indicadores', 'ROIC, ROCE y EVA por país y del grupo en US$. Verde: el ROIC supera al WACC por más de 1 punto y no hay errores críticos abiertos.'));
+    add(m, header(null, 'Indicadores', '¿Cada país gana más de lo que le cuesta su capital? ROIC: lo que rinde cada dólar invertido. WACC: lo mínimo que debe rendir. EVA: lo que gana por encima de ese mínimo, en US$.'));
     var body = skel(3); add(m, body);
     var load = function () {
       maybe(api('/kpi' + qs({ version: VERSION }))).then(function (K) {
@@ -2643,36 +2668,47 @@
           add(body, empty('Aún no hay indicadores para ' + versionLabel(VERSION) + '.', 'Se calculan al consolidar.', caps().corp ? linkBtn('Ir a Consolidación', '#/analisis/consolidacion', 'primary') : null));
           return;
         }
-        var cos = obj(K.companies), G = K.group || {};
-        add(body, h('div', { class: 'kpis' }, [
-          kpi('ROIC del grupo', pct(G.roic), G.light === 'verde' ? 'ok' : G.light === 'rojo' ? 'bad' : 'warn', 'WACC ' + pct(G.wacc)),
-          kpi('ROCE del grupo', pct(G.roce)), kpi('EVA del grupo', usdM(G.eva), Number(G.eva) >= 0 ? 'ok' : 'bad', Number(G.eva) >= 0 ? 'Crea valor' : 'Destruye valor'),
-          kpi('NOPAT', usdM(G.nopat)), kpi('Capital invertido', usdM(G.ci))
+        var cos = obj(K.companies), G = K.group || {}, codes = Object.keys(cos);
+        var gap = function (k) { return isNum(k.roic) && isNum(k.wacc) ? (Number(k.roic) - Number(k.wacc)) * 100 : null; };
+        var worst = codes.slice().sort(function (a, b) { return (gap(cos[a]) || 0) - (gap(cos[b]) || 0); })[0];
+        var gG = gap(G), w = worst ? cos[worst] : null, wBad = w && Number(w.roic) < Number(w.wacc);
+        add(body, h('div', { class: 'kpis k3' }, [
+          kpi('ROIC del grupo', pct(G.roic), isNum(gG) && gG >= 0 ? 'ok' : 'bad', 'WACC ' + pct(G.wacc) + (isNum(gG) ? (gG >= 0 ? ' · rinde ' + num(gG, 1) + ' puntos más' : ' · le faltan ' + num(-gG, 1) + ' puntos') : '')),
+          kpi('EVA del grupo', usdM(G.eva), Number(G.eva) >= 0 ? 'ok' : 'bad', Number(G.eva) >= 0 ? 'El grupo crea valor' : 'El grupo destruye valor'),
+          w ? kpi(wBad ? 'País que destruye valor' : 'País con menos margen', countryName(worst), wBad ? 'bad' : 'warn', 'ROIC ' + pct(w.roic) + ' frente a WACC ' + pct(w.wacc) + ' · EVA ' + usdM(w.eva)) : null
         ]));
-        var tc = card('ROIC, ROCE y EVA', 'Capital invertido = capital de trabajo operativo neto + activo fijo neto' + (K.average_method === 'two_point' ? ' (promedio de saldo inicial y final).' : '.'));
-        var rowOf = function (label, k, total) {
-          var spread = isNum(k.roic) && isNum(k.wacc) ? (k.roic - k.wacc) * 100 : null, L = obj(k.local);
-          return h('tr', { class: total ? 'total' : null }, h('th', { scope: 'row', text: label }), tdn(usdM(k.ebit)), tdn(usdM(k.nopat)), tdn(usdM(k.ci)),
-            tdn(pct(k.roic)), tdn(pct(k.wacc)), tdn(pts(spread), cls(spread)), tdn(pct(k.roce)), tdn(usdM(k.eva), cls(k.eva)),
-            td(lightTag(k.light)),
-            h('td', { class: 'wide' }, arr(k.reasons).length ? h('ul', {}, arr(k.reasons).map(function (t) { return h('li', { text: t }); })) : h('small', { text: '—' })));
+        var list = codes.map(function (c) { return { code: c, name: countryName(c), roic: Number(cos[c].roic) || 0, wacc: Number(cos[c].wacc) || 0 }; }).sort(function (a, b) { return (b.roic - b.wacc) - (a.roic - a.wacc); });
+        var cc = card('ROIC frente a WACC por país', 'La barra es lo que rinde cada país; la raya, lo mínimo que debe rendir. Si la barra pasa la raya, el país crea valor.');
+        add(cc, roicWaccChart(list));
+        add(body, cc);
+        var tc = card('¿Quién crea valor y quién tiene datos por corregir?', 'Son dos preguntas distintas: un país puede crear valor y aun así tener errores abiertos en su archivo.');
+        var rowOf = function (label, k, code) {
+          var sp = gap(k), n = Number(k.criticals) || 0;
+          var val = !isNum(sp) ? tag('Sin dato', 'neutral') : sp >= 1 ? tag('Crea valor', 'ok') : sp >= -1 ? tag('En el límite', 'warn') : tag('Destruye valor', 'bad');
+          var dat = n ? tag(num(n) + (n === 1 ? ' error abierto' : ' errores abiertos'), 'bad') : tag('Sin errores', 'ok');
+          return h('tr', { class: code ? null : 'total' }, h('th', { scope: 'row', text: label }), tdn(pct(k.roic)), tdn(pct(k.wacc)), tdn(pts(sp), cls(sp)), tdn(usdM(k.eva), cls(k.eva)), td(val),
+            td(code && n && caps().corp ? h('a', { href: '#/proceso/' + code, class: 'taglink', title: 'Ver los errores de ' + label }, dat) : dat));
         };
-        var rows = Object.keys(cos).map(function (code) { return rowOf(coLabel(code), cos[code]); });
-        rows.push(rowOf('Grupo consolidado', G, true));
-        add(tc, table([['País'], ['EBIT', 'num'], ['NOPAT', 'num'], ['Capital invertido', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['ROIC − WACC', 'num'], ['ROCE', 'num'], ['EVA', 'num'], ['Semáforo'], ['Razones']], rows, { cards: true, caption: 'Indicadores por país' }));
-        add(tc, h('small', { class: 'muted', text: 'Todas las cifras en US$, la moneda del grupo. Cada país ve sus cifras en su moneda en Proceso por país.' }));
+        var rows = codes.map(function (c) { return rowOf(coLabel(c), cos[c], c); });
+        rows.push(rowOf('Grupo consolidado', G, null));
+        add(tc, table([['País'], ['ROIC', 'num'], ['WACC', 'num'], ['Diferencia', 'num'], ['EVA', 'num'], ['¿Crea valor?'], ['¿Datos limpios?']], rows, { cards: true, caption: 'Valor y calidad de datos por país' }));
+        add(tc, h('small', { class: 'muted', text: 'Crea valor: el ROIC supera al WACC por más de 1 punto. Todas las cifras en US$.' }));
         add(body, tc);
-        add(body, scenarioCard(K));
-        add(body, copiedCard(obj(K.copied)));
-        add(body, impactsCard(arr(K.impacts)));
+        var dc = card('Cálculo completo', 'EBIT, NOPAT, capital invertido y ROCE de cada país, en US$. Capital invertido = capital de trabajo operativo neto + activo fijo neto' + (K.average_method === 'two_point' ? ' (promedio de saldo inicial y final).' : '.'));
+        var drow = function (label, k, total) { return h('tr', { class: total ? 'total' : null }, h('th', { scope: 'row', text: label }), tdn(usdM(k.ebit)), tdn(usdM(k.nopat)), tdn(usdM(k.ci)), tdn(pct(k.roic)), tdn(pct(k.roce))); };
+        var drows = codes.map(function (c) { return drow(coLabel(c), cos[c]); }); drows.push(drow('Grupo consolidado', G, true));
+        add(dc, table([['País'], ['EBIT', 'num'], ['NOPAT', 'num'], ['Capital invertido', 'num'], ['ROIC', 'num'], ['ROCE', 'num']], drows, { cards: true, caption: 'Cálculo completo' }));
+        add(body, fold(dc));
+        add(body, fold(scenarioCard(K)));
+        add(body, fold(impactsCard(arr(K.impacts))));
+        add(body, fold(copiedCard(obj(K.copied))));
         add(body, h('div', { class: 'acts' }, linkBtn('Ver propuestas de inversión', '#/analisis/proyectos', 'ghost', 'briefcase'), linkBtn('Ver evolución 2023–2027', '#/analisis/evolutivo', 'ghost', 'trend')));
       }, function (e) { errorState(body, e, load); });
     };
     load();
-  }
-  var COPY_UNIT = { monto: function (v, cur) { return loc(v, cur); }, pct: function (v) { return isNum(v) ? num(v, 2) + ' %' : '—'; }, usd: function (v) { return usd(v); } };
+  }  var COPY_UNIT = { monto: function (v, cur) { return loc(v, cur); }, pct: function (v) { return isNum(v) ? num(v, 2) + ' %' : '—'; }, usd: function (v) { return usd(v); } };
   function copiedCard(copied) {
-    var cd = card('Indicadores reportados por el país vs calculados', 'Hoja indicadores_reportados de 2027. Tolerancia: 0.5 % o 0.2 puntos.');
+    var cd = card('Cifras que el país reportó distinto', 'Lo que cada país escribió en su hoja de indicadores frente a lo que calcula Trazo. Tolerancia: 0.5 % o 0.2 puntos.');
     var rows = [];
     Object.keys(copied).forEach(function (code) {
       var x = copied[code];
@@ -2691,25 +2727,24 @@
     });
     if (!rows.length) { add(cd, empty('Ningún país reportó indicadores en esta versión.', 'La hoja indicadores_reportados solo viene en 2027.')); return cd; }
     var nBad = rows.filter(function (r) { return r._bad; }).length;
-    rows = rows.filter(function (r) { return r._bad; }).concat(rows.filter(function (r) { return !r._bad; }));
-    add(cd, nBad ? note('bad', 'xcircle', nBad + ' indicador(es) reportado(s) no coinciden con el cálculo', 'Aparecen primero en la tabla.') : note('ok', 'check', null, 'Todos los indicadores reportados coinciden con el cálculo.'));
+    var nOk = rows.length - nBad;
+    rows = rows.filter(function (r) { return r._bad; });
+    add(cd, nBad ? note('bad', 'xcircle', nBad + (nBad === 1 ? ' cifra reportada no coincide' : ' cifras reportadas no coinciden') + ' con el cálculo', 'Las otras ' + nOk + ' coinciden y no se muestran. Se corrigen en Proceso por país.') : note('ok', 'check', null, 'Todas las cifras reportadas coinciden con el cálculo.'));
+    if (!nBad) return cd;
     add(cd, paged(rows, 40, function (part) { return table([['País'], ['Indicador'], ['Reportado', 'num'], ['Calculado', 'num'], ['Diferencia', 'num'], ['Estado']], part, { cards: true, caption: 'Indicadores reportados vs calculados' }); }));
     return cd;
   }
   function impactsCard(list) {
-    var cd = card('Impacto de los hallazgos abiertos', 'Cuánto cambiarían el ROIC y el EVA del país si se corrige cada hallazgo con el valor esperado.');
-    if (!list.length) { add(cd, empty('No hay hallazgos abiertos con impacto en los indicadores.', null)); return cd; }
-    add(cd, paged(list, 30, function (part) {
-      return table([['País'], ['Hallazgo'], ['Celda'], ['Impacto US$', 'num'], ['Cambio en ROIC', 'num'], ['Cambio en EVA', 'num']], part.map(function (i) {
-        var im = obj(i.impact);
-        return h('tr', {}, td(coShort(i.company)), h('td', { class: 'wide' }, h('span', { text: i.message || '' }), h('small', { text: [i.code, im.text].filter(Boolean).join(' · ') })),
-          td(h('span', { class: 'mono', text: (i.sheet || '') + ' ' + cell(i.col, i.row) })), tdn(isNum(i.impact_usd) ? usdM(i.impact_usd) : '—'),
-          tdn(im.applies ? pts(im.points) : '—', cls(im.points)), tdn(im.applies ? signedUsdM(im.delta_eva) : '—', cls(im.delta_eva)));
-      }), { cards: true, caption: 'Impacto de hallazgos' });
-    }));
+    var moving = list.filter(function (i) { return obj(i.impact).applies; });
+    var cd = card('Errores que cambian el ROIC', moving.length ? num(moving.length) + ' de ' + num(list.length) + ' errores abiertos mueven el ROIC o el EVA del país. Los demás no cambian los indicadores.' : 'Ningún error abierto cambia los indicadores.');
+    if (!moving.length) { add(cd, note('ok', 'check', null, 'Corregir los errores abiertos no cambia el ROIC ni el EVA de ningún país.')); return cd; }
+    add(cd, table([['País'], ['Error'], ['Cambio en ROIC', 'num'], ['Cambio en EVA', 'num']], moving.map(function (i) {
+      var im = obj(i.impact);
+      return h('tr', {}, td(coLabel(i.company)), h('td', { class: 'wide' }, h('span', { text: i.message || '' }), h('small', { class: 'mono', text: (i.sheet || '') + ' ' + cell(i.col, i.row) })),
+        tdn(pts(im.points), cls(im.points)), tdn(signedUsdM(im.delta_eva), cls(im.delta_eva)));
+    }), { cards: true, caption: 'Errores que cambian el ROIC' }));
     return cd;
-  }
-  /** Escenarios ±10 % (History::scenarios del servidor; si no está, cálculo aproximado en el navegador). */
+  }  /** Escenarios ±10 % (History::scenarios del servidor; si no está, cálculo aproximado en el navegador). */
   function scenarioCard(K) {
     var S = K.scenarios, cos = obj(K.companies), G = K.group || {};
     var cd = card('Escenarios', 'Qué pasa con ROIC y EVA si el dólar o el volumen se mueven 10 %.');
@@ -2731,8 +2766,10 @@
     };
     var get = function (caseKey) {
       if (S && S.companies) {
-        var o = { companies: {}, group: obj(S.group)[caseKey] || {} };
-        Object.keys(obj(S.companies)).forEach(function (code) { o.companies[code] = obj(S.companies[code])[caseKey] || {}; });
+        // La base es la cifra de arriba; el escenario le suma solo el cambio que calcula el servidor.
+        var anchor = function (cur, sb, sc) { var o2 = {}; ['roic', 'eva'].forEach(function (f) { o2[f] = isNum(cur[f]) && isNum(sb[f]) && isNum(sc[f]) ? Number(cur[f]) + Number(sc[f]) - Number(sb[f]) : cur[f]; }); return o2; };
+        var o = { companies: {}, group: anchor(G, obj(obj(S.group).base), obj(obj(S.group)[caseKey])) };
+        Object.keys(obj(S.companies)).forEach(function (code) { o.companies[code] = anchor(cos[code] || {}, obj(obj(S.companies[code]).base), obj(obj(S.companies[code])[caseKey])); });
         return o;
       }
       return local(caseKey);
@@ -2763,7 +2800,7 @@
      ===================================================================== */
   function viewProposals() {
     var m = page('propuestas');
-    add(m, header('Grupo', 'Propuestas de inversión', 'Cada país presentó su propuesta con su ROIC, WACC y EVA. El sistema la recalcula con el WACC oficial de la sede y dice si la decisión se sostiene.'));
+    add(m, header(null, 'Propuestas de inversión', 'Cada proyecto debe rendir más que el WACC oficial de su país. Trazo recalcula lo que presentó cada país y dice si la decisión se sostiene.'));
     var body = skel(2); add(m, body);
     var load = function () {
       api('/proposals').then(function (P) {
@@ -2771,15 +2808,23 @@
         P = P || {};
         var items = arr(P.items);
         if (!items.length) { add(body, empty('No hay propuestas.', 'Vienen en la hoja propuestas_inversion del archivo corporativo.')); return; }
-        if (!P.recalculated) add(body, note('warn', 'alert', 'Aún sin recalcular', 'Se muestran las propuestas tal como se presentaron; el recálculo no está disponible por ahora.'));
+        if (!P.recalculated) { add(body, note('warn', 'alert', 'Aún sin recalcular', 'Se muestran las propuestas tal como se presentaron; el recálculo no está disponible por ahora.')); add(body, h('div', { class: 'grid2' }, items.map(proposalPresented))); return; }
         var holds = items.filter(function (p) { return p.holds; }).length;
-        if (P.recalculated) add(body, h('div', { class: 'kpis' }, [kpi('Propuestas', num(items.length)), kpi('Decisión se sostiene', num(holds), holds === items.length ? 'ok' : 'warn'), kpi('Hay que revisar', num(items.length - holds), items.length - holds ? 'bad' : 'ok')]));
-        add(body, h('div', { class: 'grid2' }, items.map(function (p) { return P.recalculated ? proposalCard(p) : proposalPresented(p); })));
+        add(body, h('div', { class: 'kpis k3' }, [kpi('Propuestas', num(items.length)), kpi('Decisión se sostiene', num(holds), holds === items.length ? 'ok' : 'warn'), kpi('Hay que revisar', num(items.length - holds), items.length - holds ? 'bad' : 'ok')]));
+        var tc = card('Propuestas y decisión', 'Margen = ROIC del proyecto menos el WACC de su país. Si el margen es chico, la decisión pasa de aprobar a ajustar.');
+        add(tc, table([['Proyecto'], ['Inversión', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['Margen', 'num'], ['Decisión']], items.map(function (p) {
+          var dp = DECISION[p.decision_propuesta] || [p.decision_propuesta || '—', 'neutral'], dr = DECISION[p.decision_recalculada] || [p.decision_recalculada || '—', 'neutral'];
+          var sp = isNum(p.roic) && isNum(p.wacc) ? (Number(p.roic) - Number(p.wacc)) * 100 : null;
+          return h('tr', {}, h('th', { scope: 'row' }, h('b', { text: p.id + ' · ' + (p.description || '') }), h('small', { class: 'blk', text: coLabel(p.site) })),
+            tdn(usdM(p.investment_usd)), tdn(pct(p.roic, 2)), tdn(pct(p.wacc, 1)), tdn(pts(sp), cls(sp)),
+            td(p.holds ? tag(dr[0], dr[1]) : h('span', { class: 'dec' }, h('s', { text: dp[0] }), icon('arrowRight', 14), tag(dr[0], dr[1]))));
+        }), { cards: true, caption: 'Propuestas de inversión' }));
+        add(body, tc);
+        items.filter(function (p) { return !p.holds; }).forEach(function (p) { add(body, proposalCard(p)); });
       }, function (e) { errorState(body, e, load); });
     };
     load();
-  }
-  function proposalCard(p) {
+  }  function proposalCard(p) {
     var dp = DECISION[p.decision_propuesta] || [p.decision_propuesta || '—', 'neutral'], dr = DECISION[p.decision_recalculada] || [p.decision_recalculada || '—', 'neutral'];
     var cd = card(p.id + ' · ' + (p.description || ''), coLabel(p.site) + ' · inversión ' + usdM(p.investment_usd), p.holds ? tag('Se sostiene', 'ok') : tag('No se sostiene', 'bad'));
     var row = function (lbl, a, b, ok) { return h('tr', {}, h('th', { scope: 'row', text: lbl }), tdn(a), tdn(b), td(ok === undefined ? '' : ok ? tag('Bien', 'ok') : tag('Revisar', 'warn'))); };
@@ -2813,21 +2858,30 @@
   function viewActions() {
     var m = page('acciones');
     var nb = btn('Nueva acción', function () { actionForm(null, viewActions, { version: VERSION }); }, 'primary', {}, 'plus');
-    add(m, header(VERSION ? versionLabel(VERSION) : 'Directiva', 'Acciones y seguimiento', 'Qué se va a hacer, quién, para cuándo y qué efecto se espera.', nb));
+    add(m, header(null, 'Acciones y seguimiento', 'Qué se va a hacer, quién lo hace, para cuándo y qué se espera lograr.', nb));
     var body = skel(2); add(m, body);
     var load = function () {
-      api('/actions' + qs({ version: VERSION })).then(function (list) {
+      Promise.all([api('/actions' + qs({ version: VERSION })), api('/findings' + qs({ version: VERSION, status: 'abierta' })).catch(function () { return null; })]).then(function (r) {
         ready(body);
-        list = arr(list);
+        var list = arr(r[0]), F = r[1];
+        var openCrit = arr(F && F.items).filter(function (i) { return i.severity === 'critico'; });
+        // Cada país con errores críticos abiertos tiene su acción: si falta, se crea sola al abrir la pestaña.
+        var pending = missingSeeds(openCrit, list);
+        if (pending.length && !SEEDING[VERSION]) {
+          SEEDING[VERSION] = true;
+          seedActions(pending).then(function () { SEEDING[VERSION] = false; load(); }, function (e) { SEEDING[VERSION] = false; fail(e); });
+          add(body, skel(2));
+          return;
+        }
+        if (!list.length) { add(body, empty('No hay acciones en ' + versionLabel(VERSION) + '.', 'No hay errores críticos abiertos. Si hace falta, crea una con «Nueva acción».')); return; }
         var t = today();
         var late = list.filter(function (a) { return a.status !== 'hecha' && a.due_date && a.due_date < t; }).length;
-        add(body, h('div', { class: 'kpis' }, [
-          kpi('Pendientes', num(list.filter(function (a) { return a.status === 'pendiente'; }).length)),
-          kpi('En curso', num(list.filter(function (a) { return a.status === 'en_curso'; }).length)),
-          kpi('Hechas', num(list.filter(function (a) { return a.status === 'hecha'; }).length), 'ok'),
-          kpi('Vencidas', num(late), late ? 'bad' : 'ok')
-        ]));
-        var fs = select([['abiertas', 'Abiertas'], ['', 'Todas']].concat(ACTION_ST), 'abiertas'), q = h('input', { type: 'search', placeholder: 'Buscar por acción o responsable' });
+        var done = list.filter(function (a) { return a.status === 'hecha'; }).length;
+        add(body, h('div', { class: 'kpis k3' }, [
+          kpi('Abiertas', num(list.length - done), null, num(list.filter(function (a) { return a.status === 'en_curso'; }).length) + ' en curso'),
+          kpi('Hechas', num(done), done ? 'ok' : null, num(Math.round(done / list.length * 100)) + ' % del total'),
+          kpi('Vencidas', num(late), late ? 'bad' : 'ok', late ? 'Pasaron su fecha límite' : 'Ninguna vencida')
+        ]));        var fs = select([['abiertas', 'Abiertas'], ['', 'Todas']].concat(ACTION_ST), 'abiertas'), q = h('input', { type: 'search', placeholder: 'Buscar por acción o responsable' });
         var holder = h('div');
         var draw = function () {
           clear(holder);
@@ -2858,6 +2912,33 @@
       }, function (e) { errorState(body, e, load); });
     };
     load();
+  }
+  var SEEDING = {};
+  function seedKey(code) { return code === '—' ? ' entre países' : ' de ' + countryName(code); }
+  /** Errores críticos abiertos de los países que todavía no tienen una acción abierta para corregirlos. */
+  function missingSeeds(items, actions) {
+    var open = arr(actions).filter(function (a) { return a.status !== 'hecha' && /^(Corregir|Conciliar) /.test(a.title || ''); });
+    return items.filter(function (i) {
+      var k = seedKey(companyByCode(i.company) ? i.company : '—');
+      return !open.some(function (a) { var t = a.title || ''; return t.slice(-k.length) === k; });
+    });
+  }
+  /** Una acción por país con sus errores críticos abiertos (y una para las diferencias entre países sin dueño). */
+  function seedActions(items) {
+    var by = {};
+    items.forEach(function (i) { var k = companyByCode(i.company) ? i.company : '—'; (by[k] = by[k] || []).push(i); });
+    var calls = Object.keys(by).map(function (code) {
+      var L = by[code], cats = {};
+      L.forEach(function (i) { var c = catLabel(i.category); cats[c] = (cats[c] || 0) + 1; });
+      var detail = Object.keys(cats).map(function (c) { return c + ' (' + cats[c] + ')'; }).join(', ');
+      var b = code === '—'
+        ? { title: 'Conciliar ' + num(L.length) + (L.length === 1 ? ' diferencia' : ' diferencias') + ' entre países', owner: 'Finanzas del grupo' }
+        : { title: 'Corregir ' + num(L.length) + (L.length === 1 ? ' error crítico' : ' errores críticos') + ' de ' + countryName(code), owner: ownerOf(code) };
+      b.due_date = today(7); b.status = 'pendiente'; b.version = VERSION;
+      b.effect = 'Que el archivo pase la validación y se pueda consolidar en firme. Errores: ' + detail + '.';
+      return post('/actions', b);
+    });
+    return Promise.all(calls).then(function () { return calls.length; });
   }
   function actionForm(a, done, prefill, title) {
     var v = a || prefill || {};
@@ -2890,7 +2971,7 @@
   var METRICS = [['revenue', 'Ingresos', 'usd'], ['ebit', 'EBIT', 'usd'], ['roic', 'ROIC', 'pct'], ['wacc', 'WACC', 'pct'], ['eva', 'EVA', 'usd']];
   function viewEvolution() {
     var m = page('evolutivo');
-    add(m, header('Análisis', 'Evolutivo', 'Ingresos, EBIT, ROIC, WACC y EVA por país: reales 2023–2025 del historial, real 2026 y presupuestos 2027 consolidados. Puntos huecos = presupuesto.'));
+    add(m, header(null, 'Evolutivo', 'Cómo se mueve cada país año con año. Abre en ROIC: si la línea de un país queda debajo de su WACC, ese país destruye valor. Puntos rellenos: años reales; puntos huecos: presupuesto 2027.'));
     var body = skel(2); add(m, body);
     var load = function () {
       api('/history').then(function (Hs) {
@@ -2906,7 +2987,7 @@
         }
         var codes = Object.keys(trend).filter(function (k) { return k !== 'GRUPO'; });
         if (!codes.length) { add(body, empty('No hay series para mostrar.', 'Se arman con el historial del archivo corporativo y las versiones consolidadas.')); return; }
-        var metric = 'revenue', scope = 'paises';
+        var metric = 'roic', scope = 'paises';
         var chartBox = h('div'), tableBox = h('div');
         var draw = function () {
           var met = METRICS.filter(function (x) { return x[0] === metric; })[0];
@@ -2932,7 +3013,7 @@
     var labels = [];
     series.forEach(function (s) { s.pts.forEach(function (p) { if (labels.indexOf(p.label) < 0) labels.push(p.label); }); });
     var yr = {}; series.forEach(function (s) { s.pts.forEach(function (p) { yr[p.label] = (p.year || 0) * 10 + (p.source === 'historial' || /real/i.test(p.label) ? 0 : 1); }); });
-    return labels.sort(function (a, b) { return (yr[a] - yr[b]) || labels.indexOf(a) - labels.indexOf(b); });
+    return labels.slice().sort(function (a, b) { return (yr[a] - yr[b]) || String(a).localeCompare(String(b)); });
   }
   /** Gráfico de líneas en SVG en línea (un color por serie, etiqueta al final de cada línea, puntos huecos = presupuesto). */
   function lineChart(series, metric, kind, title) {
@@ -2991,7 +3072,7 @@
   function viewPreventive() {
     var m = page('preventivo');
     if (!VERSION) { noVersion(m, 'Preventivo'); return; }
-    add(m, header(versionLabel(VERSION), 'Preventivo', 'Qué país necesita apoyo antes del cierre: hallazgos de esta versión frente al historial 2024–2026, la categoría que más se repite y la regla que la evitaría.'));
+    add(m, header(null, 'Preventivo', 'Qué país necesita apoyo antes del cierre, qué error repite y qué regla lo evitaría la próxima vez.'));
     var body = skel(3); add(m, body);
     var load = function () {
       Promise.all([api('/findings' + qs({ version: VERSION })), api('/quality').catch(function () { return null; })]).then(function (r) {
@@ -3001,19 +3082,25 @@
           add(body, note('warn', 'alert', 'El análisis histórico no está disponible por ahora', 'Mientras tanto, revisa los hallazgos de la versión.', h('div', { class: 'acts' }, linkBtn('Ir a hallazgos', '#/proceso', 'small'))));
         } else {
           var countries = obj(Q.countries), ranking = arr(Q.ranking).length ? arr(Q.ranking) : Object.keys(countries);
-          var rc = card('Ranking por país', 'Primero el país con más hallazgos en esta versión. La tendencia compara con su último ciclo del historial.');
-          add(rc, table([['Prioridad', 'num'], ['País'], ['Hallazgos', 'num'], ['Último ciclo', 'num'], ['Tendencia'], ['Categoría que más se repite'], ['Regla preventiva sugerida']], ranking.map(function (code, i) {
-            var x = countries[code] || {}, sv = obj(x.severity), tr = TREND[x.trend] || [x.trend || '—', 'neutral', 'dot'];
-            return h('tr', {}, tdn(String(i + 1)), h('th', { scope: 'row', text: coLabel(code) }),
-              tdn(h('span', {}, h('b', { text: num(x.total) }), h('small', { text: num(sv.critico) + ' crít. · ' + num(sv.aviso) + ' av.' }))), tdn(num(x.last_total)),
-              td(h('span', { class: 'tag t-' + tr[1] }, icon(tr[2], 13), h('span', { text: tr[0] }))),
-              td(x.top_category ? h('div', {}, h('b', { text: catLabel(x.top_category) }), h('small', { text: num(x.top_count) + ' vez/veces entre historial y versión actual' })) : '—'),
-              h('td', { class: 'wide' }, x.rule ? h('div', {}, h('span', { text: x.rule }), x.message ? h('small', { text: x.message }) : null) : h('small', { text: x.message || '—' })));
-          }), { cards: true, caption: 'Ranking preventivo' }));
-          add(body, rc);
-          add(body, h('div', { class: 'grid2' }, (function () { var c = card('Hallazgos actuales por categoría', 'Todos los países'); add(c, categoryBars(obj(Q.by_category))); return c; })(),
-            deliveryCard(deliv)));
-          var hc = card('Historial por país', 'Errores por categoría, días de retraso, reenvíos y esfuerzo para consolidar en ciclos anteriores.');
+          var delivBy = {};
+          arr(deliv && deliv.rows).filter(function (x) { return x.version === VERSION; }).forEach(function (x) { delivBy[x.code] = x; });
+          var veces = function (n) { return num(n) + (Number(n) === 1 ? ' vez' : ' veces'); };
+          add(body, h('div', { class: 'pv-grid' }, ranking.filter(function (code) { return !!companyByCode(code); }).map(function (code, i) {
+            var x = countries[code] || {}, sv = obj(x.severity), tr = TREND[x.trend] || [x.trend || '—', 'neutral', 'dot'], d = delivBy[code];
+            return h('article', { class: 'card pv' },
+              h('div', { class: 'pv-h' }, h('h3', { text: coLabel(code) }), tag('Prioridad ' + (i + 1), i === 0 ? 'bad' : i < 3 ? 'warn' : 'neutral')),
+              h('dl', { class: 'pv-dl' },
+                h('dt', { text: 'Hallazgos' }), h('dd', {}, h('b', { text: num(x.total) }), h('span', { class: 'muted', text: ' · ' + num(sv.critico) + ' críticos, ' + num(sv.aviso) + ' avisos' })),
+                h('dt', { text: 'Frente al ciclo anterior' }), h('dd', {}, h('span', { class: 'tag t-' + tr[1] }, icon(tr[2], 13), h('span', { text: tr[0] })), h('span', { class: 'muted', text: ' antes ' + num(x.last_total) })),
+                h('dt', { text: 'Lo que más repite' }), h('dd', { text: x.top_category ? catLabel(x.top_category) + ' · ' + veces(x.top_count) + ' contando ciclos anteriores' : '—' }),
+                h('dt', { text: 'Entrega' }), h('dd', {}, d ? uploadTag({ status: d.status }) : tag('Sin subir', 'neutral'))),
+              x.rule ? h('div', { class: 'pv-rule' }, h('small', { text: 'Regla sugerida' }), h('p', { text: x.rule })) : null,
+              x.rule ? h('div', { class: 'acts' }, btn('Convertir en acción', function () {
+                actionForm(null, function () { toast('Acción creada. Síguela en la pestaña Acciones.', 'ok'); }, { title: 'Regla preventiva para ' + countryName(code) + ': ' + (x.top_category ? catLabel(x.top_category) : 'calidad de datos'), owner: ownerOf(code), due_date: today(30), version: VERSION, effect: x.rule }, 'Convertir en acción');
+              }, 'ghost small', {}, 'tasks')) : null);
+          })));
+          var cc = card('Hallazgos de esta versión por tipo', 'Todos los países'); add(cc, categoryBars(obj(Q.by_category))); add(body, cc);
+          var hc = card('Historial por país', 'Errores por tipo, días de retraso, reenvíos y horas para consolidar en ciclos anteriores.');
           ranking.forEach(function (code) {
             var x = countries[code] || {}, hist = arr(x.history);
             var det = h('details', { class: 'more' }, h('summary', { text: coLabel(code) + ' · ' + hist.length + ' ciclo(s) en el historial' }));
@@ -3024,7 +3111,7 @@
             else add(det, h('p', { class: 'muted small', text: 'Sin historial.' }));
             add(hc, det);
           });
-          add(body, hc);
+          add(body, fold(hc));
         }
       }, function (e) { errorState(body, e, load); });
     };

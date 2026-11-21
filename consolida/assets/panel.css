@@ -712,3 +712,32 @@ details.fold[open] > summary { border-bottom: 1px solid var(--line); margin-bott
 
 /* Botón de la capa de IA real (trazo-ia): a la derecha, bajo las acciones de la oportunidad. */
 .opp > .tia-acts { grid-column: 2 / -1; justify-self: end; }
+
+/* ---------- 0.8.2 · Análisis más claro ---------- */
+.tabpanel .eyebrow { display: none; }
+.brief { border-left: 0; }
+.bridge { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.bridge .bstep { background: var(--surface-2); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bridge .bstep small { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.bridge .bstep b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.bridge .bstep span { color: var(--muted); font-size: 13px; }
+.bridge .bstep.res { background: var(--ok-s); }
+.bridge .bstep.res b { color: var(--ok); }
+.bridge .op { align-self: center; font-size: 24px; color: var(--muted); text-align: center; }
+@media (max-width: 760px) { .bridge { grid-template-columns: 1fr; } .bridge .op { line-height: 1; } }
+.pv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.pv { display: flex; flex-direction: column; gap: 12px; }
+.pv-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pv-h h3 { margin: 0; font-size: 16px; }
+.pv-dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 13.5px; }
+.pv-dl dt { color: var(--muted); }
+.pv-dl dd { margin: 0; }
+.pv-rule { background: var(--surface-2); border-radius: var(--radius); padding: 10px 12px; }
+.pv-rule small { color: var(--muted); font-weight: 600; }
+.pv-rule p { margin: 4px 0 0; font-size: 13.5px; }
+.pv .acts { margin-top: auto; }
+.dec { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dec s { color: var(--muted); }
+small.blk { display: block; color: var(--muted); font-weight: 400; }
+a.taglink { text-decoration: none; }
+a.taglink:hover .tag { filter: brightness(.95); text-decoration: underline; }

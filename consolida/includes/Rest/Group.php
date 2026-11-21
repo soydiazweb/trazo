@@ -646,7 +646,8 @@ class Group extends Base {
 				++$by_comp[ $co ][ $cat ];
 			}
 			++$by_comp[ $co ]['total'];
-			if ( 'critico' === ( $i['severity'] ?? '' ) ) {
+			// Solo cuentan los críticos abiertos: los corregidos o explicados ya no bloquean.
+			if ( 'critico' === ( $i['severity'] ?? '' ) && 'abierta' === ( $i['status'] ?? 'abierta' ) ) {
 				++$crit;
 				++$by_comp[ $co ]['critical'];
 			}
