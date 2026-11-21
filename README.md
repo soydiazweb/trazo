@@ -6,6 +6,7 @@ países y 3 monedas que se consolida solo, en una moneda, sin capturas manuales 
 | | |
 | --- | --- |
 | Sistema | Plugin de WordPress **Trazo** → [`consolida/`](consolida/) |
+| IA real (opcional) | Plugin **Trazo · IA** → [`trazo-ia/`](trazo-ia/): plan de mejora y reglas del país con cualquier IA |
 | En línea | https://trazo.kinsta.cloud/trazo/ |
 | Documento de la solución | [`SOLUCION.md`](SOLUCION.md): reto, procesos, datos analizados, hallazgos y logros del módulo 5 |
 | Plan por fases con agentes | [`PLAN.md`](PLAN.md) |
