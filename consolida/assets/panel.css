@@ -660,3 +660,55 @@ details.fold[open] > summary { border-bottom: 1px solid var(--line); margin-bott
 .next-bar { display: flex; align-items: center; }
 .next-bar .grow { flex: 1; }
 @media (max-width: 600px) { .simbox { flex-direction: column; align-items: stretch; } }
+
+/* ---------- Errores visuales y lectura resumida ---------- */
+.ivis-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ivis { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ivis.bad { border-left-color: var(--bad); } .ivis.warn { border-left-color: var(--warn); }
+.ivis-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ivis-h b { font-size: 14px; }
+.ivis-imp { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--bad); }
+.ivis-w { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.ivis-msg { margin: 0; font-size: 13px; color: var(--ink-2); }
+.ivis-cmp { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font-size: 12px; }
+.ivis-cmp .bar { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; display: block; }
+.ivis-cmp .bar i { display: block; height: 100%; border-radius: 5px; }
+.ivis-cmp .bar i.is { background: var(--bad); } .ivis-cmp .bar i.ok { background: var(--ok); }
+.ivis-fix { display: flex; gap: 8px; align-items: flex-start; background: var(--ok-s); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.ivis-fix .ico { color: var(--ok); margin-top: 1px; }
+.ivis-fix small { color: var(--ink-2); }
+.rchips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.rchip { display: flex; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.rchip .ico { color: var(--accent); flex: none; }
+.rchip b { display: block; font-size: 15px; }
+.rchip small { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
+.dash-2.tight { gap: 14px; align-items: start; }
+.kpis.k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .rchips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .ivis-list { grid-template-columns: 1fr; } .rchips { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis.k3 { grid-template-columns: 1fr; } }
+
+/* ---------- Inicio: IA simulada y pestañas ---------- */
+.ai-card { border-color: #7C5CE0; box-shadow: 0 0 0 1px rgba(124, 92, 224, .15); }
+.ai-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #EFEAFD; color: #5B3CC4; font-size: 12px; font-weight: 600; }
+.btn.ai { background: #6D4ED8; color: #fff; border-color: #6D4ED8; }
+.btn.ai:hover { background: #5B3CC4; }
+.opp-acts { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.ai-plan { grid-column: 1 / -1; margin-top: 8px; padding: 12px 14px; border-radius: 10px; background: #F5F2FE; border: 1px solid #DDD3FB; font-size: 13px; }
+.ai-plan b { display: flex; align-items: center; gap: 6px; color: #5B3CC4; }
+.ai-plan ol { margin: 8px 0; padding-left: 20px; }
+.ai-think { color: #5B3CC4; display: inline-flex; align-items: center; gap: 6px; animation: aipulse 1s ease-in-out infinite alternate; }
+@keyframes aipulse { from { opacity: .45; } to { opacity: 1; } }
+.tab-btn { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; font: inherit; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.tab-btn.on { color: var(--accent-text); border-bottom-color: var(--accent); font-weight: 600; }
+@media (prefers-color-scheme: dark) {
+  .ai-badge { background: #2B2350; color: #C9B8FF; }
+  .ai-plan { background: #221C3E; border-color: #3B3170; }
+  .ai-plan b, .ai-think { color: #C9B8FF; }
+}
+@media (prefers-reduced-motion: reduce) { .ai-think { animation: none; } }
+
+.brief { border-left: 4px solid var(--accent); }
+.brief-l { margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Botón de la capa de IA real (trazo-ia): a la derecha, bajo las acciones de la oportunidad. */
+.opp > .tia-acts { grid-column: 2 / -1; justify-self: end; }

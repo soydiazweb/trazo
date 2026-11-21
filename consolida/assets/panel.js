@@ -320,6 +320,7 @@
     swap: [['path', { d: 'M4 8h13l-3-3' }], ['path', { d: 'M20 16H7l3 3' }]],
     gear: [['circle', { cx: '12', cy: '12', r: '3' }], ['path', { d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' }]],
     arrowRight: [['path', { d: 'M5 12h14' }], ['path', { d: 'M13 6l6 6-6 6' }]],
+    sparkle: [['path', { d: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z' }], ['path', { d: 'M19 3v4M17 5h4' }]],
     arrowLeft: [['path', { d: 'M19 12H5' }], ['path', { d: 'M11 6l-6 6 6 6' }]],
     sliders: [['path', { d: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0' }], ['circle', { cx: '16', cy: '6', r: '2' }], ['circle', { cx: '10', cy: '12', r: '2' }], ['circle', { cx: '18', cy: '18', r: '2' }]]
   };
@@ -688,23 +689,71 @@
     if (!VERSION) { noVersion(m, 'Inicio'); return; }
     var key = VERSION, chosen = RESULT_BASE[key];
     var base = chosen === '-' ? null : chosen && chosen !== key && versionByKey(chosen) ? chosen : baseFor(key);
-    add(m, header(versionLabel(key), 'Resultado del grupo', 'Los 5 países unidos como un solo corporativo, en US$: si el grupo crea valor, qué sede suma o resta y qué decidir.'));
-    var top = skel(3), board = h('div', { class: 'stack' });
-    add(m, [top, board]);
+    add(m, header(versionLabel(key), 'Resultado del grupo', 'Los 5 países unidos como un solo corporativo, en US$. Arriba lo principal; abajo, la IA sugiere mejoras y las pestañas muestran cada resultado.'));
+    var top = skel(3); add(m, top);
+    var rest = h('div', { class: 'stack' }); add(m, rest);
     var load = function () {
       loadDash(key, base).then(function (D) {
         ready(top);
         if (!D.H.hasCorporate || !META.versions.length) { add(top, homeNoData()); return; }
         if (!D.H.lastResult) {
-          add(top, empty('Aún no se consolida ' + versionLabel(key) + '.', 'Carga y revisa el Excel de cada país y luego consolida.', linkBtn('Ir al proceso por país', '#/proceso', 'primary', 'arrowRight')));
+          add(top, empty('Aún no se consolida ' + versionLabel(key) + '.', 'Usa el Demo guiado o el Proceso por país y luego consolida.', linkBtn('Ir al demo guiado', '#/datos', 'primary', 'arrowRight')));
           return;
         }
-        renderDashboard(top, D, 'top');
-        renderDashboard(board, D, 'board');
+        var tmpTop = h('div'), tmpBoard = h('div');
+        renderDashboard(tmpTop, D, 'top');
+        renderDashboard(tmpBoard, D, 'board');
+        var cardsBy = {};
+        Array.prototype.forEach.call(tmpTop.querySelectorAll('section.card'), function (x) { var t = x.querySelector('h2'); if (t) cardsBy[t.textContent] = x; });
+        Array.prototype.forEach.call(tmpBoard.querySelectorAll('section.card'), function (x) { var t = x.querySelector('h2'); if (t) cardsBy[t.textContent] = x; });
+        var pick = function (t) { var x = cardsBy[t]; if (x && x.parentNode) x.parentNode.removeChild(x); return x || null; };
+        // Franja, frase y 5 indicadores (lo que queda de la parte de arriba).
+        var errs = pick('Los errores que más pesan'), pend = pick('Decisiones pendientes');
+        Array.prototype.forEach.call(tmpTop.children, function (x) { add(top, x); });
+        // Gráficos principales.
+        add(top, h('div', { class: 'dash-2' }, pick('Quién suma y quién resta valor'), pick('Por qué cambian las ventas del grupo')));
+        add(top, h('div', { class: 'dash-2' }, pick('ROIC frente a WACC'), pick('Ingresos y EBIT por sede')));
+        // Sugerencias de la IA.
+        var opp = pick('Oportunidades de mejora');
+        if (opp) {
+          var hh = opp.querySelector('.card-h h2'), sub = opp.querySelector('.card-h small');
+          if (hh) hh.textContent = 'Mejoras que sugiere la IA';
+          if (sub) sub.textContent = 'Después de analizar el consolidado, las desviaciones y las propuestas · ordenadas por efecto en EVA';
+          opp.classList.add('ai-card');
+          var hd = opp.querySelector('.card-h');
+          if (hd) add(hd, h('span', { class: 'ai-badge' }, icon('sparkle', 14), h('span', { text: 'IA · simulación' })));
+          add(rest, opp);
+        }
+        // Pestañas con cada resultado.
+        var tabsDef = [
+          ['Errores y decisiones', [errs, pend]],
+          ['Sedes', [pick('Ranking por sede'), pick('Crecimiento frente a rentabilidad')]],
+          ['Tendencia y calidad', [pick('Evolución del grupo: ROIC frente a WACC'), pick('Errores encontrados por tipo')]],
+          ['Proyectos', null]
+        ];
+        var panels = [], btns = [];
+        var tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Resultados' });
+        var show = function (i) {
+          btns.forEach(function (bt, j) { bt.classList.toggle('on', i === j); bt.setAttribute('aria-selected', String(i === j)); });
+          panels.forEach(function (pn, j) { pn.hidden = i !== j; });
+          if (tabsDef[i][1] === null && !panels[i].dataset.loaded) {
+            panels[i].dataset.loaded = '1'; TAB_HOST = panels[i]; demoteHeadings(panels[i]); viewProposals(); TAB_HOST = null;
+          }
+        };
+        tabsDef.forEach(function (t, i) {
+          var bt = h('button', { type: 'button', role: 'tab', class: 'tab-btn', text: t[0], onclick: function () { show(i); } });
+          btns.push(bt); add(tabs, bt);
+          var pn = h('section', { class: 'tabpanel', role: 'tabpanel', 'aria-label': t[0] });
+          if (t[1]) add(pn, h('div', { class: 'dash-2' }, t[1].filter(Boolean)));
+          panels.push(pn);
+        });
+        add(rest, h('section', { class: 'card' }, h('div', { class: 'card-h' }, h('div', {}, h('h2', { text: 'Resultados en detalle' }), h('small', { text: 'Elige una pestaña' }))), tabs, panels));
+        show(0);
       }, function (e) { errorState(top, e, function () { DASH_CACHE = null; load(); }); });
     };
     load();
   }
+
 
   /* =====================================================================
      Paso 1 · Cargar: una tarjeta por país; al elegirlo, subir su Excel y ver lo que leyó el sistema
@@ -1036,6 +1085,67 @@
     };
     load();
   }
+  /* ---------- Errores en tarjetas visuales con la recomendación para resolverlos ---------- */
+  var FIX = {
+    FMT_SCALE_DECL: ['Indica en la portada la misma escala que usa el país («unidades» o «miles») y vuelve a subir.', 'País'],
+    FMT_SCALE_JUMP: ['Ese mes está en otra escala: vuelve a escribir sus montos en la misma unidad que el resto del archivo (unidades o miles).', 'País'],
+    FMT_TEXT_NUMBER: ['No bloquea: el sistema los leyó bien. Para la próxima, guarda las celdas como número, no como texto.', 'País'],
+    FMT_DATE: ['Corrige la fecha de la columna o fila para que caiga dentro del año de la versión.', 'País'],
+    CAT_UNKNOWN: ['Usa una cuenta del catálogo del grupo o pide al corporativo que agregue la nueva cuenta al perfil de lectura del país.', 'País y corporativo'],
+    CAT_PRODUCT: ['Usa el código de producto del maestro del grupo.', 'País'],
+    CAT_CHANNEL: ['Usa el código de canal del grupo (C1 a C4).', 'País'],
+    DATA_EMPTY: ['Escribe el monto que falta en esa celda (si no hubo gasto, escribe 0).', 'País'],
+    DATA_DUP: ['Borra la fila repetida: cada cuenta va una sola vez por mes.', 'País'],
+    CALC_VOLPRICE: ['Revisa volumen, precio y ventas de esa línea: las ventas deben ser volumen × precio, igual que en el detalle de ventas.', 'País'],
+    CALC_SPLIT: ['Ajusta ventas a terceros y a empresas del grupo para que sumen las ventas netas de la línea.', 'País'],
+    CALC_DETAIL: ['Haz que el detalle por producto y canal sume lo mismo que las ventas del mes en resultados.', 'País'],
+    CALC_TOTAL: ['Quita la fila de total escrita a mano o corrígela: debe ser la suma exacta del detalle (con los signos correctos).', 'País'],
+    CALC_BS: ['El balance de ese mes no cuadra: revisa la cuenta que cambió para que activo = pasivo + patrimonio.', 'País'],
+    CALC_DEPR: ['La depreciación del mes debe ser igual al aumento de la depreciación acumulada.', 'País'],
+    SIGN: ['Escribe el monto en positivo: el signo lo pone el catálogo del grupo.', 'País'],
+    FX_USED: ['Usa la tasa oficial del corporativo para el tipo de cambio; no una tasa propia.', 'País'],
+    FX_IC_CURRENCY: ['No bloquea: se convierte con la tasa oficial. Conviene pactar las ventas internas en USD.', 'País y contraparte'],
+    IC_MISMATCH: ['Concilia con la otra empresa: los dos deben registrar el mismo monto y la misma moneda pactada.', 'País y contraparte'],
+    IC_MISSING: ['La otra empresa no registró esta operación (o tú sí y ella no): acuerden y ambos la registran.', 'País y contraparte'],
+    IC_TIMING: ['No bloquea: es un embarque en tránsito que la otra empresa registra el mes siguiente.', '—'],
+    IC_PL_TIE: ['Las ventas internas de resultados deben coincidir con la hoja de intercompañía.', 'País'],
+    IC_BALANCE: ['Concilia los saldos por cobrar y por pagar con las otras empresas al cierre del mes.', 'País y contraparte'],
+    KPI_WACC: ['Usa el WACC que fija el corporativo para el país.', 'País'],
+    KPI_COPY: ['No copies el indicador: el sistema lo calcula con tus propios estados. Deja la hoja de indicadores con las fórmulas del grupo.', 'País']
+  };
+  function fixFor(code) { return FIX[code] || (/^KPI_COPY/.test(code || '') ? FIX.KPI_COPY : ['Revisa el dato señalado y vuelve a subir el archivo.', 'País']); }
+  function issueVisual(i) {
+    var sev = SEV[i.severity] || ['', 'neutral'], fx = fixFor(i.code);
+    var where = [i.sheet ? 'hoja ' + i.sheet : null, i.col && i.row ? 'celda ' + i.col + i.row : i.row ? 'fila ' + i.row : null, isNum(i.month) ? monthName(i.month) : null].filter(Boolean).join(' · ');
+    var cd = h('article', { class: 'ivis ' + sev[1] },
+      h('div', { class: 'ivis-h' }, tag(sev[0], sev[1]), h('b', { text: issueText(i.code) || i.code }), isNum(i.impact_usd) && Number(i.impact_usd) ? h('span', { class: 'ivis-imp', text: 'Impacto ' + usdM(Math.abs(i.impact_usd)) }) : null),
+      where ? h('small', { class: 'ivis-w' }, icon('search', 13), ' ' + where) : null);
+    if (isNum(i.actual) && isNum(i.expected) && Number(i.expected) !== Number(i.actual)) {
+      var a0 = Math.abs(Number(i.actual)), e0 = Math.abs(Number(i.expected)), mx = Math.max(a0, e0) || 1;
+      add(cd, h('div', { class: 'ivis-cmp', role: 'img', 'aria-label': 'Dice ' + num(i.actual) + ', debería ' + num(i.expected) },
+        h('span', { text: 'Dice' }), h('span', { class: 'bar' }, h('i', { class: 'is', style: { width: Math.max(2, a0 / mx * 100) + '%' } })), h('b', { class: 'tnum', text: num(i.actual) }),
+        h('span', { text: 'Debería' }), h('span', { class: 'bar' }, h('i', { class: 'ok', style: { width: Math.max(2, e0 / mx * 100) + '%' } })), h('b', { class: 'tnum', text: num(i.expected) })));
+    } else add(cd, h('p', { class: 'ivis-msg', text: i.message || '' }));
+    add(cd, h('div', { class: 'ivis-fix' }, icon('check', 15), h('div', {}, h('b', { text: 'Cómo solucionarlo: ' }), fx[0], fx[1] !== '—' ? h('small', { text: ' Quién: ' + fx[1] + '.' }) : null)));
+    return cd;
+  }
+  /** Resumen visual de lo que leyó el sistema (paso 1). */
+  function readMini(r, co) {
+    var u = r.upload || {}, sm = r.datasetSummary || {}, st = obj(sm.stats), meta = obj(sm.meta), rows = obj(sm.rows), iss = arr(r.issues);
+    var cur = st.currency || meta.currency || co.currency, crit = iss.filter(function (i) { return i.severity === 'critico'; }).length;
+    var sheets = Object.keys(rows).filter(function (k) { return Number(rows[k]) > 0; }).length, scale = Number(meta.scale_applied) || 1;
+    var chip = function (ic, big, small) { return h('div', { class: 'rchip' }, icon(ic, 18), h('div', {}, h('b', { text: big }), h('small', { text: small }))); };
+    return h('div', { class: 'stack' },
+      h('div', { class: 'rchips' }, [
+        chip('doc', num(sheets) + ' hojas', 'reconocidas'), chip('calendar', num(arr(st.months).length) + ' meses', 'leídos'),
+        chip('log', num(st.accounts) + ' cuentas', 'del catálogo del grupo'), chip('sliders', scale > 1 ? '× ' + num(scale) : 'Unidades', 'escala aplicada'),
+        chip('percent', cur === 'USD' ? 'US$' : cur + ' → US$', 'tasa oficial de cada mes'), chip(crit ? 'alert' : 'check', num(crit) + ' críticos', 'encontrados al revisar')]),
+      isNum(st.revenue_local) ? h('div', { class: 'kpis' }, [
+        kpi('Ingresos del año', usdM(st.revenue_usd), null, cur !== 'USD' ? loc(st.revenue_local, cur) : null),
+        kpi('EBIT del año', usdM(st.ebit_usd), null, 'margen ' + pct(Number(st.revenue_local) ? st.ebit_local / st.revenue_local : null)),
+        kpi('Archivo', u.file_name || '', null, dt(u.uploaded_at))]) : null);
+  }
+
   /** Un país como asistente de 4 pasos: se ve un paso a la vez, con su botón de simulación para avanzar. */
   function processOne(m, co, many, stepArg) {
     add(m, header(versionLabel(VERSION), 'Proceso · ' + coLabel(co.code), 'Un paso a la vez. Cada paso tiene un botón «Simular» para resolverlo y avanzar, o puedes hacerlo de verdad (subir, corregir, enviar).', many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
@@ -1077,10 +1187,11 @@
                 toast('Archivo cargado: ' + num(crit) + ' error(es) crítico(s).', crit ? 'bad' : 'ok'); DASH_CACHE = null; load();
               }, fail);
             }, !u)));
+            if (u && r[0]) add(cd1, readMini(r[0], co));
             add(box, cd1);
             var up = h('div', { class: 'stack' });
             loadOne(up, co, u, load);
-            add(box, h('details', { class: 'more', open: !u ? null : true }, h('summary', { text: u ? 'Lo que leyó el sistema y subir otro archivo' : 'O sube un Excel desde tu computadora' }), up));
+            add(box, h('details', { class: 'more' }, h('summary', { text: u ? 'Ver el detalle de la lectura o subir otro archivo' : 'O sube un Excel desde tu computadora' }), up));
             var hist = arr(r[2]);
             if (hist.length > 1) add(box, h('details', { class: 'more' }, h('summary', { text: 'Cargas anteriores (' + num(hist.length) + ')' }),
               table([['Fecha'], ['Archivo'], ['Críticos', 'num'], ['Avisos', 'num'], ['Estado']], hist.map(function (x) {
@@ -1094,10 +1205,22 @@
               busy(b0, post('/uploads/' + u.id + '/simulate-fix', {})).then(function (res) { toast(num(res && res.resolved) + ' hallazgo(s) resueltos. Ya puedes enviar.', 'ok'); DASH_CACHE = null; go(3); }, fail);
             }, true)));
             else add(cd2, note('ok', 'check', 'Sin errores críticos pendientes', 'Puedes pasar al paso 3 y enviar.'));
+            var fileIss = arr(r[0] && r[0].issues), icIss = arr(r[1] && r[1].items).filter(function (i) { return i.upload_id === null && i.company === co.code; });
+            var all = fileIss.concat(icIss).filter(function (i) { return (i.status || 'abierta') === 'abierta'; });
+            all.sort(function (x, y) { return (x.severity === 'critico' ? 0 : 1) - (y.severity === 'critico' ? 0 : 1) || Math.abs(y.impact_usd || 0) - Math.abs(x.impact_usd || 0); });
+            var byCat = {}; all.forEach(function (i) { var k = i.category || 'otros'; byCat[k] = (byCat[k] || 0) + 1; });
+            var impact = all.reduce(function (t, i) { return t + Math.abs(Number(i.impact_usd) || 0); }, 0);
+            if (all.length) {
+              add(cd2, h('div', { class: 'dash-2 tight' },
+                h('div', { class: 'kpis k3' }, [kpi('Críticos', num(all.filter(function (i) { return i.severity === 'critico'; }).length), 'bad', 'impiden enviar'),
+                  kpi('Avisos', num(all.filter(function (i) { return i.severity !== 'critico'; }).length), 'warn', 'se explican'), kpi('Impacto', usdM(impact), null, 'estimado en US$')]),
+                h('div', {}, h('small', { class: 'muted', text: 'Qué tipo de errores tiene' }), categoryBars(byCat, null))));
+            }
             add(box, cd2);
+            if (all.length) add(box, h('div', { class: 'ivis-list' }, all.map(issueVisual)));
             var rev = h('div', { class: 'stack' });
             if (r[0]) reviewOne(rev, co, r[0], r[1], load);
-            add(box, h('details', { class: 'more', open: Number(u.criticals) ? true : null }, h('summary', { text: 'Ver cada error con su hoja y celda' }), rev));
+            add(box, h('details', { class: 'more' }, h('summary', { text: 'Ver la tabla completa y explicar avisos a mano' }), rev));
             add(box, nextBar(!Number(u.criticals)));
           } else if (active === 3) {
             var cd3 = card('Paso 3 · Aprobar y enviar al corporativo', u ? (u.status === 'enviado' ? 'Enviado el ' + dt(u.sent_at) : 'Estado: ' + (LOAD_ST[u.status] || [u.status])[0]) : 'Primero carga el archivo', loadTag(u));
@@ -1154,6 +1277,54 @@
     DASH_CACHE = { k: k, at: Date.now(), p: p };
     return p;
   }
+  /** Conclusión para el corporativo de cada pestaña del Análisis, con su acción en el mismo lugar. */
+  function analysisBrief(tab, D) {
+    var K = D.K, key = D.key;
+    if (!K || !K.companies) return note('info', 'info', 'Aún no hay resultado consolidado de ' + versionLabel(key), 'Consolida la versión para ver las conclusiones.');
+    var cos = obj(K.companies), G = K.group || {}, codes = Object.keys(cos), pts = [], acts = [];
+    var act = function (label, title, owner, effect) {
+      acts.push(btn(label, function () { actionForm(null, function () { toast('Acción creada. Síguela en la pestaña Acciones.', 'ok'); }, { title: title, owner: owner, due_date: today(30), version: key, effect: effect }, 'Crear acción'); }, acts.length ? 'ghost small' : 'primary small', {}, 'tasks'));
+    };
+    var worst = codes.slice().sort(function (a, b) { return (cos[a].eva || 0) - (cos[b].eva || 0); })[0];
+    var best = codes.slice().sort(function (a, b) { return (cos[b].eva || 0) - (cos[a].eva || 0); })[0];
+    if (tab === 'indicadores') {
+      pts.push('El grupo ' + (Number(G.eva) >= 0 ? 'crea' : 'destruye') + ' valor: ROIC ' + pct(G.roic) + ' frente a un WACC de ' + pct(G.wacc) + ', EVA ' + usdM(G.eva) + '.');
+      pts.push('Más valor: ' + countryName(best) + ' (EVA ' + usdM(cos[best].eva) + '). Menos valor: ' + countryName(worst) + ' (EVA ' + usdM(cos[worst].eva) + ', ROIC ' + pct(cos[worst].roic) + ' vs WACC ' + pct(cos[worst].wacc) + ').');
+      if (Number(cos[worst].eva) < 0) act('Plan para ' + countryName(worst), 'Recuperar el ROIC de ' + countryName(worst) + ' por encima de su WACC', ownerOf(worst), 'EVA actual ' + usdM(cos[worst].eva));
+    } else if (tab === 'consolidacion') {
+      var prov = arr(D.S && D.S.provisional), crit = D.F && D.F.counts ? D.F.counts.critical : 0, ic = D.F && D.F.counts ? obj(D.F.counts.by_category).intercompania || 0 : 0;
+      pts.push(prov.length ? 'Consolidación provisional: incluye errores abiertos de ' + prov.map(countryName).join(', ') + '.' : 'Consolidación definitiva: los 5 países enviaron sus archivos.');
+      pts.push(num(crit) + ' errores críticos abiertos; ' + num(ic) + ' diferencias de intercompañía entre países.');
+      if (ic) act('Conciliar intercompañía', 'Conciliar las diferencias intercompañía entre países', 'Finanzas del grupo', num(ic) + ' diferencias por resolver');
+      if (crit) act('Pedir correcciones a los países', 'Corregir los errores críticos de los archivos de los países', 'Responsables de datos', num(crit) + ' errores críticos');
+    } else if (tab === 'desviaciones') {
+      var V = D.V && D.V.group;
+      if (V) {
+        pts.push(V.text || ('Las ventas cambian ' + signedUsdM(V.delta) + ' frente a ' + versionLabel(D.base) + '.'));
+        var ef = obj(V.effects), fx = Number(ef.tipo_cambio) || 0;
+        if (fx < 0) { pts.push('El tipo de cambio resta ' + usdM(Math.abs(fx)) + ' a las ventas en dólares.'); act('Cubrir el tipo de cambio', 'Definir cobertura cambiaria y pactar ventas internas en USD', 'Finanzas del grupo', 'Efecto cambiario ' + signedUsdM(fx)); }
+      } else pts.push('Elige una versión base consolidada para comparar.');
+    } else if (tab === 'proyectos') {
+      var risk = arr(D.P && D.P.items).filter(function (p) { return p.decision_recalculada && p.decision_propuesta !== p.decision_recalculada; });
+      pts.push(num(arr(D.P && D.P.items).length) + ' propuestas revisadas; ' + num(risk.length) + ' no se sostienen con las reglas del grupo.');
+      risk.forEach(function (p) { pts.push(p.id + ' · ' + countryName(p.site) + ': se presentó para «' + p.decision_propuesta + '» y corresponde «' + p.decision_recalculada + '».'); act('Revisar ' + p.id, 'Ajustar el proyecto ' + p.id + ' de ' + countryName(p.site) + ' antes de aprobarlo', ownerOf(p.site), 'Decisión recalculada: ' + p.decision_recalculada); });
+    } else if (tab === 'evolutivo') {
+      pts.push('ROIC del grupo hoy: ' + pct(G.roic) + ' frente a WACC ' + pct(G.wacc) + '.');
+      if (Number(cos[worst].eva) < 0) { var st = evaStreak(D.Hs, worst); pts.push(countryName(worst) + (st.years >= 2 ? ' destruye valor desde ' + st.from + '.' : ' destruye valor en esta versión.')); act('Revisión estratégica de ' + countryName(worst), 'Revisión estratégica de ' + countryName(worst) + ' (EVA negativo sostenido)', 'Directiva', 'EVA ' + usdM(cos[worst].eva)); }
+    } else if (tab === 'preventivo') {
+      var bc = D.F && D.F.counts ? obj(D.F.counts.by_category) : {}, topc = Object.keys(bc).sort(function (a, b) { return bc[b] - bc[a]; })[0];
+      if (topc && bc[topc]) { pts.push('El tipo de error que más se repite: ' + catLabel(topc) + ' (' + num(bc[topc]) + ').'); act('Crear regla preventiva', 'Regla preventiva en la plantilla: ' + catLabel(topc), 'Finanzas del grupo', 'Evitar ' + num(bc[topc]) + ' errores en el próximo ciclo'); }
+      else pts.push('Sin errores registrados en esta versión.');
+    } else if (tab === 'acciones') {
+      pts.push('Aquí se siguen las acciones creadas desde cada pestaña: responsable, fecha y estado.');
+    }
+    if (!pts.length) return null;
+    var cd = card('Conclusión para el corporativo', versionLabel(key) + (D.base ? ' · comparado con ' + versionLabel(D.base) : ''));
+    cd.classList.add('brief');
+    add(cd, h('ul', { class: 'brief-l' }, pts.map(function (t) { return h('li', { text: t }); })));
+    if (acts.length) add(cd, h('div', { class: 'acts' }, acts));
+    return cd;
+  }
   function viewAnalysis(tab, args) {
     tab = ANALYSIS_TABS.some(function (t) { return t[0] === tab; }) ? tab : 'indicadores';
     args = args || [];
@@ -1164,9 +1335,12 @@
     var tabs = h('nav', { class: 'tabs', 'aria-label': 'Temas del análisis' }, ANALYSIS_TABS.filter(function (t) { return t[0] !== 'consolidacion' || caps().corp; }).map(function (t) {
       return h('a', { href: '#/analisis/' + t[0], class: t[0] === tab ? 'on' : null, 'aria-current': t[0] === tab ? 'page' : null, text: t[1] });
     }));
+    var brief = h('div'); add(brief, skel(1));
     var panel = h('section', { class: 'tabpanel', 'aria-label': label });
-    add(m, [tabs, panel]);
+    add(m, [tabs, brief, panel]);
     document.title = label + ' · Análisis · Trazo';
+    var bkey = VERSION;
+    loadDash(bkey, baseFor(bkey)).then(function (D) { ready(brief); var b0 = analysisBrief(tab, D); if (b0) add(brief, b0); }, function () { ready(brief); });
     TAB_HOST = panel;
     demoteHeadings(panel);
     if (tab === 'indicadores') viewKpi();
@@ -1502,12 +1676,38 @@
       h('span', { class: 'opp-ico t-' + o.chip, 'aria-hidden': 'true' }, icon(o.icon)),
       h('div', { class: 'opp-b' }, h('h3', { text: o.title }), h('p', { text: o.text }),
         h('p', { class: 'opp-fx' }, o.effects.map(function (e) { return h('span', { class: e[1] === 'ok' ? 'c-ok' : 'c-bad', text: e[0] }); }))),
+      h('div', { class: 'opp-acts' }, hasRealAI() ? null : btn('Generar plan con IA', function (e) { aiPlan(e.currentTarget, o); }, 'ai small', {}, 'sparkle'),
       caps().board ? btn('Crear plan de acción', function () {
         actionForm(null, function () { toast('Plan de acción creado. Síguelo en «Acciones y seguimiento».', 'ok'); }, {
           title: o.title, owner: ownerOf(o.site), due_date: today(30), version: key,
           effect: o.effects.map(function (e) { return e[0]; }).join(' · ') + '. ' + o.text
         }, 'Crear plan de acción');
-      }, 'primary small', {}, 'tasks') : null);
+      }, 'ghost small', {}, 'tasks') : null));
+  }
+  /** Plan sugerido por la IA (simulación: se arma con reglas a partir de la oportunidad, sin llamar a un modelo). */
+  var AI_STEPS = {
+    propuesta: ['Recalcular el proyecto con el WACC oficial de la sede y un escenario conservador de ventas.', 'Ajustar alcance o inversión hasta que el ROIC supere el WACC por 2 puntos.', 'Volver a presentar al comité con el EVA recalculado.'],
+    margen: ['Separar el margen por línea y canal para ubicar dónde se pierde.', 'Revisar precios y descuentos en la línea con peor margen y negociar el costo de lo que compra al grupo.', 'Fijar una meta trimestral de margen EBIT y medirla en cada cierre.'],
+    capital: ['Identificar activo fijo ocioso o de baja utilización.', 'Reducir días de inventario y de cobro con metas por sede.', 'Medir la rotación del capital en cada cierre frente al promedio del grupo.'],
+    fx: ['Pactar las ventas internas en USD.', 'Evaluar una cobertura del tipo de cambio para el presupuesto del año.', 'Presentar los resultados también a tipo de cambio constante para separar operación y moneda.']
+  };
+  /** Si el sitio tiene la capa de IA real (trazo-ia), ella pone su propio botón: aquí no se duplica. */
+  function hasRealAI() { return !!document.querySelector('script[src*="trazo-ia/panel-ia.js"]'); }
+  function aiPlan(btnEl, o) {
+    var art = btnEl.closest('.opp'), old = art.querySelector('.ai-plan');
+    if (old) { old.remove(); return; }
+    var box = h('div', { class: 'ai-plan', 'aria-live': 'polite' }, h('span', { class: 'ai-think' }, icon('sparkle', 14), ' Analizando datos del grupo…'));
+    art.appendChild(box);
+    btnEl.disabled = true;
+    setTimeout(function () {
+      clear(box);
+      var steps = AI_STEPS[o.kind] || ['Revisar el indicador con el equipo de la sede.', 'Definir una acción con responsable y fecha.', 'Medir el efecto en el siguiente cierre.'];
+      add(box, [h('b', {}, icon('sparkle', 14), ' Plan sugerido por la IA para ' + (countryName(o.site) || 'el grupo')),
+        h('ol', {}, steps.map(function (x) { return h('li', { text: x }); })),
+        h('p', { class: 'muted', text: 'Efecto esperado: ' + o.effects.map(function (e) { return e[0]; }).join(' · ') + '.' }),
+        h('small', { class: 'muted', text: 'Simulación: en la versión final este plan lo redactaría un modelo de IA con los datos del grupo.' })]);
+      btnEl.disabled = false;
+    }, 1100);
   }
   /** Barras horizontales de EVA por sede (divergentes desde cero) + eliminaciones + grupo. */
   function evaBars(rows, elim, group) {
