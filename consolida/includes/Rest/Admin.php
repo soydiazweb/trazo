@@ -90,6 +90,19 @@ class Admin extends Base {
 		return array_merge( $base, $engine );
 	}
 
+	/** Versiones con la marca has_result: si ya tienen una consolidación guardada (para elegir bases comparables). */
+	private static function versions_with_results(): array {
+		global $wpdb;
+		$done = array_flip( (array) $wpdb->get_col( 'SELECT DISTINCT version_key FROM ' . \Consolida\Schema::t( 'results' ) ) ); // phpcs:ignore
+		return array_map(
+			function ( $v ) use ( $done ) {
+				$v['has_result'] = isset( $done[ $v['key'] ] );
+				return $v;
+			},
+			Store::versions()
+		);
+	}
+
 	public static function meta() {
 		$corp = Store::corporate();
 		$out  = array(
@@ -97,7 +110,7 @@ class Admin extends Base {
 			'products'       => $corp['products'],
 			'channels'       => $corp['channels'],
 			'companies'      => Store::companies( Roles::visible_company_ids() ),
-			'versions'       => Store::versions(),
+			'versions'       => self::versions_with_results(),
 			'categories'     => Store::CATEGORIES,
 			'issueCodes'     => self::issue_codes(),
 			'uploadStatuses' => array(
