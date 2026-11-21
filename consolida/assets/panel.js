@@ -521,7 +521,7 @@
      Marco: barra de pasos (menú principal), versión de trabajo y menú de cuenta y ajustes (⚙)
      Flujo: 1 Cargar · 2 Revisar · 3 Consolidar · 4 Resultado. País ve 1–2; directiva solo 4; corporativo y admin los 4.
      ===================================================================== */
-  var main = null, flowNav = null, versionSel = null, gearBtn = null, gearMenu = null;
+  var main = null, flowNav = null, versionSel = null, gearBtn = null, gearMenu = null, nav = null;
   var STEP_DEFS = [['cargar', '1', 'Cargar'], ['revisar', '2', 'Revisar'], ['consolidar', '3', 'Consolidar'], ['resultado', '4', 'Resultado']];
   var ACTIVE_STEP = null, STEP_STATE = null;
   var TAB_HOST = null;          // con una pestaña del Resultado activa, page() pinta dentro de ella
@@ -545,36 +545,47 @@
     gearMenu.hidden = !open; gearBtn.setAttribute('aria-expanded', String(open));
     if (open) { var f = gearMenu.querySelector('a'); if (f) f.focus(); }
   }
+  /** Menú lateral: pocas opciones. Inicio = resultado del grupo; Proceso = flujo de cada país; Análisis = detalle. */
+  function navGroups() {
+    var c = caps(), cb = c.corp || c.board;
+    return [
+      [null, [['inicio', cb ? 'Inicio · resultado del grupo' : 'Inicio', 'home', true],
+        ['proceso', 'Proceso por país', 'upload', c.country || c.corp],
+        ['analisis', 'Análisis', 'chart', cb]]],
+      ['Configuración', [['reglas', 'Reglas y tasas', 'percent', c.corp], ['perfiles', 'Perfiles de lectura', 'sliders', c.corp],
+        ['bitacora', 'Bitácora', 'log', c.corp], ['datos', 'Datos y demo', 'database', c.corp || c.admin]]]
+    ];
+  }
+  function setNav(open) { app.classList.toggle('nav-open', open); var b = app.querySelector('.menu-btn'); if (b) b.setAttribute('aria-expanded', String(open)); }
   function buildShell() {
     clear(app);
-    app.classList.add('flow');
-    flowNav = h('nav', { class: 'flowbar', 'aria-label': 'Pasos del proceso' });
+    app.classList.remove('flow');
+    nav = h('nav', { class: 'side', id: 'csl-nav', 'aria-label': 'Secciones' },
+      h('a', { class: 'brand', href: '#/inicio', 'aria-label': 'Trazo, ir al inicio' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true', text: 'T' }), h('div', {}, h('b', { text: 'Trazo' }), h('small', { text: 'Consolidación del grupo · Grupo Meridia' }))));
+    navGroups().forEach(function (g) {
+      var items = g[1].filter(function (it) { return it[3]; });
+      if (!items.length) return;
+      if (g[0]) add(nav, h('div', { class: 'sec', text: g[0] }));
+      items.forEach(function (it) { add(nav, h('a', { href: '#/' + it[0], 'data-k': it[0] }, icon(it[2]), h('span', { text: it[1] }))); });
+    });
+    var roles = [], c = caps();
+    if (c.admin) roles.push('Administrador'); else { if (c.corp) roles.push('Corporativo'); if (c.board && !c.corp) roles.push('Directiva'); if (c.country) roles.push('País'); }
+    add(nav, h('div', { class: 'me' }, h('b', { text: (ME && ME.name) || (C.user && C.user.name) || '' }), h('small', { text: roles.join(' · ') }),
+      C.logout ? h('a', { href: C.logout }, icon('logout'), h('span', { text: 'Cerrar sesión' })) : null));
+    if (C.version) add(nav, h('div', { class: 'ver', text: 'Trazo ' + C.version }));
+    nav.addEventListener('click', function (e) { if (e.target.closest('a')) setNav(false); });
     versionSel = h('select', { id: 'csl-version', onchange: function () {
       if (DIRTY && !confirm('Tienes cambios sin guardar. ¿Cambiar de versión sin guardar?')) { versionSel.value = VERSION || ''; return; }
       DIRTY = false; setVersion(versionSel.value); DASH_CACHE = null; route();
     } });
     fillVersionSel();
-    var roles = [], c = caps();
-    if (c.admin) roles.push('Administrador'); else { if (c.corp) roles.push('Corporativo'); if (c.board && !c.corp) roles.push('Directiva'); if (c.country) roles.push('País'); }
-    gearMenu = h('div', { class: 'gear-menu', id: 'csl-gear', hidden: true },
-      h('div', { class: 'gm-me' }, h('b', { text: (ME && ME.name) || (C.user && C.user.name) || '' }), h('small', { text: roles.join(' · ') })),
-      gearItems().length ? h('div', { class: 'gm-sec', text: 'Ajustes' }) : null,
-      gearItems().map(function (it) { return h('a', { href: '#/' + it[0], 'data-k': it[0], onclick: function () { setGear(false); } }, icon(it[2]), h('span', { text: it[1] })); }),
-      C.logout ? h('a', { href: C.logout, class: 'gm-out' }, icon('logout'), h('span', { text: 'Cerrar sesión' })) : null,
-      C.version ? h('small', { class: 'gm-ver', text: 'Trazo ' + C.version }) : null);
-    gearBtn = h('button', { type: 'button', class: 'gear-btn', 'aria-expanded': 'false', 'aria-controls': 'csl-gear', 'aria-label': 'Cuenta y ajustes', title: 'Cuenta y ajustes',
-      onclick: function () { setGear(gearMenu.hidden); } }, icon('gear'), h('span', { class: 'gear-name', text: firstName() }));
-    var top = h('header', { class: 'top flow-top', role: 'banner' },
-      h('a', { class: 'brand', href: '#/inicio', 'aria-label': 'Trazo, ir al inicio' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true', text: 'T' }),
-        h('div', {}, h('b', { text: 'Trazo' }), h('small', { text: 'Consolidación del grupo · Grupo Meridia' }))),
-      flowNav,
-      h('div', { class: 'cyc' }, h('label', { for: 'csl-version', text: 'Versión' }), versionSel),
-      h('div', { class: 'gear-wrap' }, gearBtn, gearMenu));
+    var top = h('div', { class: 'top', role: 'banner' },
+      h('button', { type: 'button', class: 'btn ghost small menu-btn', 'aria-controls': 'csl-nav', 'aria-expanded': 'false', onclick: function () { setNav(!app.classList.contains('nav-open')); } }, icon('menu'), h('span', { text: 'Menú' })),
+      h('div', { class: 'cyc' }, h('label', { for: 'csl-version', text: 'Versión de trabajo' }), versionSel),
+      h('span', { class: 'grow' }));
     main = h('main', { class: 'main', id: 'csl-main', tabindex: '-1' });
-    add(app, h('div', { class: 'wrap' }, top, main));
-    document.addEventListener('click', function (e) { if (gearMenu && !gearMenu.hidden && !e.target.closest('.gear-wrap')) setGear(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && gearMenu && !gearMenu.hidden) { setGear(false); gearBtn.focus(); } });
-    refreshSteps();
+    add(app, [nav, h('div', { class: 'scrim', onclick: function () { setNav(false); } }), h('div', { class: 'wrap' }, top, main)]);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && app.classList.contains('nav-open')) setNav(false); });
   }
   function fillVersionSel() {
     if (!versionSel) return;
@@ -638,14 +649,16 @@
     api('/home' + qs({ version: v })).then(function (H) { if (v === VERSION) { STEP_STATE = H; drawSteps(); } }, function () { /* la barra queda sin estado */ });
   }
   function refreshScore() { refreshSteps(); }
-  var TITLES = { inicio: 'Inicio', cargar: 'Cargar', revisar: 'Revisar', consolidar: 'Consolidar', resultado: 'Resultado', reglas: 'Reglas y tasas', perfiles: 'Perfiles de lectura', bitacora: 'Bitácora', datos: 'Datos y demo' };
-  var STEP_OF = { cargar: 'cargar', revisar: 'revisar', consolidar: 'consolidar', resultado: 'resultado' };
+  var TITLES = { inicio: 'Inicio', proceso: 'Proceso por país', analisis: 'Análisis', cargar: 'Cargar', revisar: 'Revisar', consolidar: 'Consolidar', resultado: 'Resultado', reglas: 'Reglas y tasas', perfiles: 'Perfiles de lectura', bitacora: 'Bitácora', datos: 'Datos y demo' };
+  var STEP_OF = {};
+  var NAV_OF = { cargar: 'proceso', revisar: 'proceso', proceso: 'proceso', consolidar: 'analisis', resultado: 'inicio', analisis: 'analisis' };
   function page(key, navKey) {
     DIRTY = false;
     if (TAB_HOST && document.body.contains(TAB_HOST)) { clear(TAB_HOST); return TAB_HOST; }
     ACTIVE_STEP = STEP_OF[navKey || key] || null;
     drawSteps();
-    if (gearMenu) Array.prototype.forEach.call(gearMenu.querySelectorAll('a[data-k]'), function (a) { var on = a.getAttribute('data-k') === key; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    var navK = NAV_OF[navKey || key] || key;
+    if (nav) Array.prototype.forEach.call(nav.querySelectorAll('a[data-k]'), function (a) { var on = a.getAttribute('data-k') === navK; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     document.title = (TITLES[key] || 'Trazo') + ' · Trazo';
     clear(main);
     return main;
@@ -668,17 +681,27 @@
      ===================================================================== */
   function goHome() {
     var c = caps();
-    if (!c.corp && !c.board) { var mine = myCompanies(); location.replace(mine.length === 1 ? '#/cargar/' + mine[0].code : '#/cargar'); return; }
-    if (!c.corp) { location.replace('#/resultado'); return; }
+    if (!c.corp && !c.board) { location.replace('#/proceso'); return; }
     var m = page('inicio');
-    add(m, h('h1', { class: 'sr-only', tabindex: '-1', text: 'Inicio' }));
-    add(m, skel(2));
-    if (!VERSION) { location.replace('#/cargar'); return; }
-    api('/home' + qs({ version: VERSION })).then(function (H) {
-      var cos = arr(H && H.companies), up = cos.filter(function (x) { return x.upload; }).length, sent = cos.filter(function (x) { return x.upload && x.upload.status === 'enviado'; }).length;
-      // Sin archivos: paso 1 (con «Empezar con Guatemala»). Con resultado: paso 4. Todo enviado sin consolidar: paso 3. Si no, paso 1.
-      location.replace(!H || !H.hasCorporate || !up ? '#/cargar' : H.lastResult ? '#/resultado' : cos.length && sent === cos.length ? '#/consolidar' : '#/cargar');
-    }, function () { location.replace('#/cargar'); });
+    if (!VERSION) { noVersion(m, 'Inicio'); return; }
+    var key = VERSION, chosen = RESULT_BASE[key];
+    var base = chosen === '-' ? null : chosen && chosen !== key && versionByKey(chosen) ? chosen : baseFor(key);
+    add(m, header(versionLabel(key), 'Resultado del grupo', 'Los 5 países unidos como un solo corporativo, en US$: si el grupo crea valor, qué sede suma o resta y qué decidir.'));
+    var top = skel(3), board = h('div', { class: 'stack' });
+    add(m, [top, board]);
+    var load = function () {
+      loadDash(key, base).then(function (D) {
+        ready(top);
+        if (!D.H.hasCorporate || !META.versions.length) { add(top, homeNoData()); return; }
+        if (!D.H.lastResult) {
+          add(top, empty('Aún no se consolida ' + versionLabel(key) + '.', 'Carga y revisa el Excel de cada país y luego consolida.', linkBtn('Ir al proceso por país', '#/proceso', 'primary', 'arrowRight')));
+          return;
+        }
+        renderDashboard(top, D, 'top');
+        renderDashboard(board, D, 'board');
+      }, function (e) { errorState(top, e, function () { DASH_CACHE = null; load(); }); });
+    };
+    load();
   }
 
   /* =====================================================================
@@ -696,11 +719,11 @@
     var m = page('cargar');
     if (!VERSION) { noVersion(m, 'Cargar'); return; }
     var r0 = resolveCountry(code), co = r0.co;
-    if (r0.denied) { add(m, header('Paso 1', 'Cargar')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/cargar', 'primary'))); return; }
+    if (r0.denied) { add(m, header('Paso 1', 'Cargar')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/proceso', 'primary'))); return; }
     add(m, header('Paso 1 de ' + stepKeys().length + ' · ' + versionLabel(VERSION), co ? 'Cargar · ' + coLabel(co.code) : 'Cargar',
       co ? 'Sube el Excel de ' + (co.country || co.name) + ' tal como lo prepara su equipo. Al terminar verás lo que el sistema leyó antes de revisar los errores.'
         : 'Elige un país para subir su Excel. Cada país manda su archivo en su propio formato; el sistema lo lee con el perfil de lectura de ese país.',
-      co && r0.many ? linkBtn('Todos los países', '#/cargar', 'ghost small') : null));
+      co && r0.many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
     var body = skel(2); add(m, body);
     var load = function () {
       api('/home' + qs({ version: VERSION })).then(function (H) {
@@ -722,7 +745,7 @@
       if (first) add(body, h('section', { class: 'card accent start-card' },
         h('div', { class: 'card-h' }, h('div', {}, h('h2', { text: 'Empezar con ' + (first.country || first.name) }), h('small', { text: 'Aún no hay archivos en ' + versionLabel(VERSION) }))),
         h('p', { text: 'Sube el Excel de ' + (first.country || first.name) + ' y mira cómo el sistema lo lee, encuentra los errores y lo deja listo para consolidar. Después repite con los demás países.' }),
-        h('div', { class: 'acts' }, linkBtn('Empezar con ' + (first.country || first.name), '#/cargar/' + first.code, 'primary', 'upload'))));
+        h('div', { class: 'acts' }, linkBtn('Empezar con ' + (first.country || first.name), '#/proceso/' + first.code, 'primary', 'upload'))));
     }
     var cd = card('Países', versionLabel(VERSION) + ' · toca un país para subir o ver su archivo');
     if (!list.length) add(cd, empty('No hay países.', 'Importa el archivo corporativo en Ajustes › Datos y demo.'));
@@ -732,10 +755,10 @@
         h('div', { class: 'co-h' }, h('div', {}, h('b', { text: coLabel(co.code) }), h('small', { text: [co.name, co.currency].filter(Boolean).join(' · ') })), loadTag(u)),
         u ? h('div', { class: 'co-n' }, h('span', {}, h('b', { class: Number(u.criticals) ? 'c-bad' : '', text: num(u.criticals) }), ' críticos'), h('span', {}, h('b', { class: Number(u.warnings) ? 'c-warn' : '', text: num(u.warnings) }), ' avisos'), h('span', { text: 'Subido ' + dt(u.uploaded_at) }))
           : h('p', { class: 'muted small', text: 'Aún no hay archivo de esta versión.' }),
-        h('div', { class: 'acts' }, linkBtn(u ? 'Ver lo leído' : 'Cargar Excel', '#/cargar/' + co.code, u ? 'ghost small' : 'primary small', u ? null : 'upload'), u ? linkBtn('Revisar', '#/revisar/' + co.code, 'small') : null));
+        h('div', { class: 'acts' }, linkBtn(u ? 'Ver lo leído' : 'Cargar Excel', '#/proceso/' + co.code, u ? 'ghost small' : 'primary small', u ? null : 'upload'), u ? linkBtn('Revisar', '#/proceso/' + co.code, 'small') : null));
     })));
     add(body, cd);
-    if (list.length && list.every(function (x) { return x.upload; })) add(body, h('div', { class: 'acts next-bar' }, linkBtn('Siguiente: revisar errores', '#/revisar', 'primary', 'arrowRight')));
+    if (list.length && list.every(function (x) { return x.upload; })) add(body, h('div', { class: 'acts next-bar' }, linkBtn('Siguiente: revisar errores', '#/proceso', 'primary', 'arrowRight')));
   }
   function loadOne(body, co, u, reload) {
     var canUp = caps().corp || ownsCompany(co.id);
@@ -815,7 +838,7 @@
     }
     var det = h('details', { class: 'more' }, h('summary', { text: 'Ver portada e indicadores reportados' }), datasetCard(s, co.code));
     add(cd, det);
-    add(cd, h('div', { class: 'acts' }, linkBtn('Siguiente: revisar errores', '#/revisar/' + co.code, 'primary', 'arrowRight'),
+    add(cd, h('div', { class: 'acts' }, btn('Siguiente: revisar errores', function () { var x = document.getElementById('csl-review'); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 'primary', {}, 'arrowRight'),
       (caps().corp || ownsCompany(co.id)) ? btn('Descargar el archivo subido', function (e) { download('/uploads/' + u.id + '/file', u.file_name || 'original.xlsx', e.currentTarget); }, 'ghost', {}, 'download') : null));
     return cd;
   }
@@ -827,15 +850,15 @@
     var m = page('revisar');
     if (!VERSION) { noVersion(m, 'Revisar'); return; }
     var r0 = resolveCountry(code), co = r0.co;
-    if (r0.denied) { add(m, header('Paso 2', 'Revisar')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/revisar', 'primary'))); return; }
+    if (r0.denied) { add(m, header('Paso 2', 'Revisar')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/proceso', 'primary'))); return; }
     if (!co) { reviewOverview(m); return; }
     add(m, header('Paso 2 de ' + stepKeys().length + ' · ' + versionLabel(VERSION), 'Revisar · ' + coLabel(co.code), 'Lo que el sistema encontró en el archivo de ' + (co.country || co.name) + ', qué hay que hacer con cada cosa y el envío al corporativo.',
-      r0.many ? linkBtn('Todos los países', '#/revisar', 'ghost small') : null));
+      r0.many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
     var body = skel(3); add(m, body);
     var load = function () {
       api('/home' + qs({ version: VERSION })).then(function (H) {
         var cur = arr(H && H.companies).filter(function (x) { return x.code === co.code; })[0] || {}, u = cur.upload;
-        if (!u) { ready(body); add(body, empty('Aún no hay archivo de ' + (co.country || co.code) + ' en ' + versionLabel(VERSION) + '.', 'Primero súbelo en el paso 1.', linkBtn('Ir a cargar', '#/cargar/' + co.code, 'primary', 'upload'))); return; }
+        if (!u) { ready(body); add(body, empty('Aún no hay archivo de ' + (co.country || co.code) + ' en ' + versionLabel(VERSION) + '.', 'Primero súbelo en el paso 1.', linkBtn('Ir a cargar', '#/proceso/' + co.code, 'primary', 'upload'))); return; }
         return Promise.all([api('/uploads/' + u.id), api('/findings' + qs({ version: VERSION, company: co.code })).catch(function () { return null; })]).then(function (r) {
           ready(body);
           reviewOne(body, co, r[0], r[1], load);
@@ -859,11 +882,11 @@
             h('div', { class: 'co-h' }, h('div', {}, h('b', { text: coLabel(co.code) }), h('small', { text: co.name || '' })), loadTag(u)),
             u ? h('div', { class: 'co-n' }, h('span', {}, h('b', { class: Number(u.criticals) ? 'c-bad' : '', text: num(u.criticals) }), ' críticos'), h('span', {}, h('b', { class: Number(u.warnings) ? 'c-warn' : '', text: num(u.warnings) }), ' avisos'),
               isNum(c2.total) ? h('span', { text: num(c2.total) + ' en total con intercompañía' }) : null) : h('p', { class: 'muted small', text: 'Sin archivo todavía.' }),
-            h('div', { class: 'acts' }, u ? linkBtn('Revisar', '#/revisar/' + co.code, Number(u.criticals) || Number(u.warnings) ? 'primary small' : 'small') : linkBtn('Cargar Excel', '#/cargar/' + co.code, 'ghost small', 'upload')));
+            h('div', { class: 'acts' }, u ? linkBtn('Revisar', '#/proceso/' + co.code, Number(u.criticals) || Number(u.warnings) ? 'primary small' : 'small') : linkBtn('Cargar Excel', '#/proceso/' + co.code, 'ghost small', 'upload')));
         })));
         add(body, cd);
         if (F && F.counts) add(body, findingsHistoryCard(F.counts, arr(F.historyCycles), '', VERSION));
-        if (caps().corp && list.length && list.every(function (x) { return x.upload && x.upload.status === 'enviado'; })) add(body, h('div', { class: 'acts next-bar' }, linkBtn('Siguiente: consolidar', '#/consolidar', 'primary', 'arrowRight')));
+        if (caps().corp && list.length && list.every(function (x) { return x.upload && x.upload.status === 'enviado'; })) add(body, h('div', { class: 'acts next-bar' }, linkBtn('Siguiente: consolidar', '#/analisis/consolidacion', 'primary', 'arrowRight')));
       }, function (e) { errorState(body, e, load); });
     };
     load();
@@ -901,10 +924,10 @@
     // Decisión: corregir, o aprobar y enviar.
     var act = card('Siguiente paso', null);
     if (u.status === 'enviado') {
-      add(act, note('ok', 'check', 'Enviado al corporativo', 'Se envió el ' + dt(u.sent_at) + '.', caps().corp ? h('div', { class: 'acts' }, linkBtn('Siguiente: consolidar', '#/consolidar', 'primary small', 'arrowRight')) : null));
+      add(act, note('ok', 'check', 'Enviado al corporativo', 'Se envió el ' + dt(u.sent_at) + '.', caps().corp ? h('div', { class: 'acts' }, linkBtn('Siguiente: consolidar', '#/analisis/consolidacion', 'primary small', 'arrowRight')) : null));
     } else if (crit.length) {
       add(act, note('bad', 'xcircle', 'Hay que corregir el archivo', 'Corrige los ' + crit.length + ' error(es) crítico(s) en el Excel y vuelve a subirlo; se valida de nuevo al momento.'));
-      add(act, h('div', { class: 'acts' }, (canEdit || caps().corp) ? linkBtn('Corregir y volver a subir', '#/cargar/' + co.code, 'primary', 'upload') : null,
+      add(act, h('div', { class: 'acts' }, (canEdit || caps().corp) ? linkBtn('Corregir y volver a subir', '#/proceso/' + co.code, 'primary', 'upload') : null,
         (canEdit || caps().corp) ? btn('Descargar el archivo subido', function (e) { download('/uploads/' + u.id + '/file', u.file_name || 'original.xlsx', e.currentTarget); }, 'ghost', {}, 'download') : null));
     } else if (pendW.length) {
       add(act, note('warn', 'alert', 'Falta explicar ' + pendW.length + ' aviso(s)', canEdit ? 'Usa el botón «Explicar» de cada aviso de arriba. Cuando no quede ninguno, aquí aparece «Aprobar y enviar».' : 'El responsable del país debe explicarlos.'));
@@ -924,7 +947,7 @@
         h('label', { class: 'check', for: 'csl-confirm' }, cb, h('span', { text: 'Confirmo que revisé las cifras y que corresponden a lo aprobado en ' + (co.name || 'el país') + (co.approver ? ' (' + co.approver + ')' : '') + '.' })),
         h('div', { class: 'acts' }, go)]);
     }
-    add(act, h('div', { class: 'acts' }, linkBtn('Ver lo que leyó el sistema', '#/cargar/' + co.code, 'link')));
+    add(act, h('div', { class: 'acts' }, linkBtn('Ver lo que leyó el sistema', '#/proceso/' + co.code, 'link')));
     add(body, act);
   }
   /** Un hallazgo en palabras simples: qué pasa, dónde, cuánto pesa y qué hacer. */
@@ -949,7 +972,137 @@
   /* =====================================================================
      Paso 4 · Resultado: resumen arriba y pestañas (Tablero, Indicadores, Desviaciones, Proyectos, Acciones, Evolutivo, Preventivo)
      ===================================================================== */
-  var RESULT_TABS = [['tablero', 'Tablero'], ['indicadores', 'Indicadores'], ['desviaciones', 'Desviaciones'], ['proyectos', 'Proyectos'], ['acciones', 'Acciones'], ['evolutivo', 'Evolutivo'], ['preventivo', 'Preventivo']];
+  /* =====================================================================
+     Proceso por país: los 4 pasos de cada país (cargar, revisar, enviar, consolidar), cargas anteriores y nuevas
+     ===================================================================== */
+  var PSTEPS = [['Cargado', 'El Excel está en el sistema'], ['Revisado', 'Sin errores críticos'], ['Enviado', 'El país lo envió al corporativo'], ['Consolidado', 'Ya suma en el resultado del grupo']];
+  function processFlags(u, H) {
+    var up = !!u, crit = up ? Number(u.criticals) || 0 : 0;
+    var rev = up && !crit, sent = up && u.status === 'enviado';
+    // Los pasos van en orden: solo cuenta como consolidado si el país ya envió (una consolidación provisional no lo cumple).
+    var cons = sent && !!(H && H.lastResult);
+    return [up, rev, sent, cons];
+  }
+  function timeline(flags, big) {
+    var cur = flags.indexOf(false);
+    return h('ol', { class: 'ptl' + (big ? ' big' : ''), 'aria-label': 'Avance en 4 pasos' }, PSTEPS.map(function (st, i) {
+      var cls = flags[i] ? 'done' : i === cur ? 'now' : 'todo';
+      return h('li', { class: cls, 'aria-current': i === cur ? 'step' : null },
+        h('span', { class: 'n', 'aria-hidden': 'true' }, flags[i] ? icon('check', 14) : String(i + 1)),
+        h('span', { class: 'txt' }, h('b', { text: st[0] }), big ? h('small', { text: st[1] }) : null));
+    }));
+  }
+  function viewProcess(code) {
+    var m = page('proceso');
+    if (!VERSION) { noVersion(m, 'Proceso por país'); return; }
+    var r0 = resolveCountry(code), co = r0.co;
+    if (r0.denied) { add(m, header(null, 'Proceso por país')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/proceso', 'primary'))); return; }
+    if (co) processOne(m, co, r0.many || caps().corp); else processList(m);
+  }
+  function processList(m) {
+    add(m, header(versionLabel(VERSION), 'Proceso por país', 'Cada país sigue 4 pasos: carga su Excel, el sistema lo revisa, el país lo envía y el corporativo consolida. Abre un país para ver sus cargas o hacer una nueva.'));
+    var body = skel(2); add(m, body);
+    var load = function () {
+      api('/home' + qs({ version: VERSION })).then(function (H) {
+        ready(body);
+        H = H || {};
+        if (!H.hasCorporate) { add(body, homeNoData()); return; }
+        var list = arr(H.companies), mine = myCompanies();
+        if (!caps().corp) list = list.filter(function (x) { return mine.some(function (y) { return y.code === x.code; }); });
+        if (!list.some(function (x) { return x.upload; }) && list.length) {
+          add(body, note('info', 'info', 'Aún no hay archivos en ' + versionLabel(VERSION), 'Empieza por ' + (list[0].country || list[0].code) + ': abre el país y sube su Excel o simula con el archivo de Meridia.'));
+        }
+        var cd = card('Países', 'Dónde va cada país en ' + versionLabel(VERSION));
+        add(cd, h('div', { class: 'plist' }, list.map(function (x) {
+          var f = processFlags(x.upload, H);
+          return h('article', { class: 'prow' },
+            h('div', { class: 'prow-h' }, h('div', {}, h('b', { text: coLabel(x.code) }), h('small', { text: (x.name || '') + ' · ' + (x.currency || '') })), loadTag(x.upload)),
+            timeline(f, false),
+            h('div', { class: 'prow-a' }, x.upload ? h('small', { text: num(x.upload.criticals) + ' críticos · ' + num(x.upload.warnings) + ' avisos' }) : h('small', { text: 'Sin archivo' }),
+              linkBtn('Abrir', '#/proceso/' + x.code, 'primary small', 'arrowRight')));
+        })));
+        add(body, cd);
+        if (caps().corp) {
+          var sent = list.filter(function (x) { return x.upload && x.upload.status === 'enviado'; }).length;
+          var cc = card('Paso 4 · Consolidar', H.lastResult ? 'Última consolidación: ' + dt(H.lastResult.created_at) : 'Aún no se consolida esta versión');
+          add(cc, h('p', { class: 'muted', text: num(sent) + ' de ' + num(list.length) + ' países enviados. ' + (sent === list.length ? 'Ya se puede consolidar.' : 'Puedes consolidar de forma provisional para ver el efecto de los errores.') }));
+          add(cc, h('div', { class: 'acts' }, linkBtn('Ir a consolidar', '#/analisis/consolidacion', sent === list.length ? 'primary' : 'ghost', 'layers'),
+            H.lastResult ? linkBtn('Ver el resultado del grupo', '#/inicio', 'ghost', 'arrowRight') : null));
+          add(body, cc);
+        }
+      }, function (e) { errorState(body, e, load); });
+    };
+    load();
+  }
+  function processOne(m, co, many) {
+    add(m, header(versionLabel(VERSION), 'Proceso · ' + coLabel(co.code), 'Carga, revisión y envío del Excel de ' + (co.country || co.name) + '.', many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
+    var body = skel(3); add(m, body);
+    var load = function () {
+      api('/home' + qs({ version: VERSION })).then(function (H) {
+        H = H || {};
+        var cur = arr(H.companies).filter(function (x) { return x.code === co.code; })[0] || {}, u = cur.upload;
+        return Promise.all([
+          api('/uploads' + qs({ company: co.id, version: VERSION })).catch(function () { return []; }),
+          u ? api('/uploads/' + u.id) : null,
+          u ? api('/findings' + qs({ version: VERSION, company: co.code })).catch(function () { return null; }) : null,
+          H.lastResult && (caps().corp || caps().board) ? maybe(api('/kpi' + qs({ version: VERSION }))).catch(function () { return null; }) : null
+        ]).then(function (r) {
+          ready(body);
+          var f = processFlags(u, H);
+          var tl = card('Dónde va ' + (co.country || co.code), null, loadTag(u));
+          add(tl, timeline(f, true));
+          add(body, tl);
+          // Paso 1 · cargar: nueva carga, simulación y lo que leyó el sistema.
+          var canUp = caps().corp || ownsCompany(co.id);
+          if (canUp) {
+            var sim = card('¿Quieres ver el proceso con datos reales?', 'Carga el archivo de Meridia de ' + (co.country || co.code) + ' para ' + versionLabel(VERSION) + ' que está en el servidor y recorre los pasos.');
+            var sb = btn('Simular con el archivo de Meridia', function () {
+              busy(sb, post('/demo/load-one', { company: co.code, version: VERSION })).then(function (res) {
+                var iss = arr(res && res.issues), crit = iss.filter(function (i) { return i.severity === 'critico'; }).length;
+                toast('Archivo de Meridia cargado: ' + num(crit) + ' error(es) crítico(s) y ' + num(iss.length - crit) + ' aviso(s).', crit ? 'bad' : 'ok');
+                DASH_CACHE = null; load();
+              }, fail);
+            }, 'ghost', {}, 'database');
+            add(sim, h('div', { class: 'acts' }, sb));
+            add(body, sim);
+          }
+          loadOne(body, co, u, load);
+          // Cargas anteriores.
+          var hist = arr(r[0]);
+          var hc = card('Cargas de ' + (co.country || co.code) + ' en ' + versionLabel(VERSION), hist.length ? num(hist.length) + ' carga(s); la vigente es la que cuenta' : 'Aún no hay cargas');
+          if (hist.length) {
+            add(hc, table([['Fecha'], ['Archivo'], ['Críticos', 'num'], ['Avisos', 'num'], ['Estado'], ['']], hist.map(function (x) {
+              return h('tr', {}, td(dt(x.uploaded_at)), td(x.file_name || ''), tdn(num(x.criticals)), tdn(num(x.warnings)),
+                h('td', {}, Number(x.superseded) ? tag('Reemplazada', 'neutral') : loadTag(x)),
+                h('td', {}, Number(x.superseded) ? null : h('small', { text: 'Vigente' })));
+            }), { caption: 'Cargas del país', cards: true }));
+          }
+          add(body, hc);
+          // Pasos 2 y 3 · revisar y enviar.
+          var rev = h('section', { id: 'csl-review', class: 'stack', 'aria-label': 'Revisión y envío' });
+          add(rev, h('h2', { class: 'sec-h', text: 'Revisar y enviar' }));
+          if (r[1]) reviewOne(rev, co, r[1], r[2], load);
+          else add(rev, empty('Cuando cargues el archivo verás aquí sus errores y podrás enviarlo.', null));
+          add(body, rev);
+          // Paso 4 · su aporte al grupo.
+          var K = r[3], kc = K && K.companies ? K.companies[co.code] : null;
+          if (kc) {
+            var ac = card('Paso 4 · Lo que aporta al grupo', 'En la última consolidación de ' + versionLabel(VERSION) + ', en US$');
+            add(ac, h('div', { class: 'kpis' }, [
+              kpi('EBIT', usdM(kc.ebit)), kpi('ROIC', pct(kc.roic), null, 'WACC ' + pct(kc.wacc)),
+              kpi('EVA', usdM(kc.eva), Number(kc.eva) < 0 ? 'bad' : 'ok', Number(kc.eva) < 0 ? 'Destruye valor' : 'Crea valor'),
+              kpi('Capital invertido', usdM(kc.ci))
+            ]));
+            add(ac, h('div', { class: 'acts' }, linkBtn('Ver el resultado del grupo', '#/inicio', 'ghost', 'arrowRight')));
+            add(body, ac);
+          }
+        });
+      }).catch(function (e) { ready(body); errorState(body, e, load); });
+    };
+    load();
+  }
+
+  var ANALYSIS_TABS = [['indicadores', 'Indicadores'], ['consolidacion', 'Consolidación'], ['desviaciones', 'Desviaciones'], ['proyectos', 'Proyectos'], ['acciones', 'Acciones'], ['evolutivo', 'Evolutivo'], ['preventivo', 'Preventivo']];
   function loadDash(key, base) {
     var k = key + '|' + (base || '-');
     if (DASH_CACHE && DASH_CACHE.k === k && Date.now() - DASH_CACHE.at < 60000) return DASH_CACHE.p;
@@ -970,35 +1123,23 @@
     DASH_CACHE = { k: k, at: Date.now(), p: p };
     return p;
   }
-  function viewResult(tab, args) {
-    tab = RESULT_TABS.some(function (t) { return t[0] === tab; }) ? tab : 'tablero';
+  function viewAnalysis(tab, args) {
+    tab = ANALYSIS_TABS.some(function (t) { return t[0] === tab; }) ? tab : 'indicadores';
     args = args || [];
-    var m = page('resultado');
-    if (!VERSION) { noVersion(m, 'Resultado'); return; }
-    var key = VERSION, chosen = RESULT_BASE[key];
-    var base = chosen === '-' ? null : chosen && chosen !== key && versionByKey(chosen) ? chosen : baseFor(key);
-    add(m, h('h1', { class: 'sr-only', tabindex: '-1', text: 'Resultado · ' + versionLabel(key) }));
-    var top = skel(3); add(m, top);
-    var label = (RESULT_TABS.filter(function (t) { return t[0] === tab; })[0] || [0, ''])[1];
-    var tabs = h('nav', { class: 'tabs', 'aria-label': 'Secciones del resultado' }, RESULT_TABS.map(function (t) {
-      return h('a', { href: '#/resultado/' + t[0], class: t[0] === tab ? 'on' : null, 'aria-current': t[0] === tab ? 'page' : null, text: t[1] });
+    var m = page('analisis');
+    if (!VERSION) { noVersion(m, 'Análisis'); return; }
+    var label = (ANALYSIS_TABS.filter(function (t) { return t[0] === tab; })[0] || [0, ''])[1];
+    add(m, header(versionLabel(VERSION), 'Análisis', 'El detalle para quien quiera profundizar: elige un tema.'));
+    var tabs = h('nav', { class: 'tabs', 'aria-label': 'Temas del análisis' }, ANALYSIS_TABS.filter(function (t) { return t[0] !== 'consolidacion' || caps().corp; }).map(function (t) {
+      return h('a', { href: '#/analisis/' + t[0], class: t[0] === tab ? 'on' : null, 'aria-current': t[0] === tab ? 'page' : null, text: t[1] });
     }));
     var panel = h('section', { class: 'tabpanel', 'aria-label': label });
     add(m, [tabs, panel]);
-    document.title = label + ' · Resultado · Trazo';
-    var load = function () {
-      loadDash(key, base).then(function (D) {
-        ready(top);
-        if (!D.H.hasCorporate || !META.versions.length) { add(top, homeNoData()); return; }
-        renderDashboard(top, D, 'top');
-        if (tab === 'tablero') { clear(panel); renderDashboard(panel, D, 'board'); }
-      }, function (e) { errorState(top, e, function () { DASH_CACHE = null; load(); }); });
-    };
-    load();
-    if (tab === 'tablero') { add(panel, skel(3)); return; }
+    document.title = label + ' · Análisis · Trazo';
     TAB_HOST = panel;
     demoteHeadings(panel);
     if (tab === 'indicadores') viewKpi();
+    else if (tab === 'consolidacion') viewConsolidation();
     else if (tab === 'desviaciones') viewVariance(args[0], args[1], args[2], args[3], isNum(args[4]) ? Number(args[4]) : null);
     else if (tab === 'proyectos') viewProposals();
     else if (tab === 'acciones') viewActions();
@@ -1020,7 +1161,7 @@
       return h('li', {}, h('span', { class: 'n', text: String(n + 1) }), h('div', {},
         h('b', { text: (companyByCode(i.company) ? countryName(i.company) : 'Entre países') + ' · ' + catLabel(i.category) + (isNum(i.impact_usd) ? ' · ' + usdM(Math.abs(i.impact_usd)) : '') }),
         h('span', { text: i.message || '' }), where ? h('small', { text: where }) : null,
-        caps().corp && companyByCode(i.company) ? h('a', { href: '#/revisar/' + i.company, class: 'small', text: 'Revisar ' + countryName(i.company) }) : caps().corp ? h('a', { href: '#/consolidar', class: 'small', text: 'Ver la conciliación' }) : null));
+        caps().corp && companyByCode(i.company) ? h('a', { href: '#/proceso/' + i.company, class: 'small', text: 'Revisar ' + countryName(i.company) }) : caps().corp ? h('a', { href: '#/analisis/consolidacion', class: 'small', text: 'Ver la conciliación' }) : null));
     })));
     return cd;
   }
@@ -1028,15 +1169,15 @@
   function pendingCard(D, cos, atRisk, destroyers) {
     var cd = card('Decisiones pendientes', null), list = [];
     atRisk.forEach(function (p) {
-      list.push({ title: 'Proyecto ' + p.id + ' · ' + countryName(p.site), text: 'Se presentó para «' + p.decision_propuesta + '» y recalculado da «' + p.decision_recalculada + '» (ROIC ' + pct(p.roic) + ' frente a WACC ' + pct(p.wacc) + ').', href: '#/resultado/proyectos',
+      list.push({ title: 'Proyecto ' + p.id + ' · ' + countryName(p.site), text: 'Se presentó para «' + p.decision_propuesta + '» y recalculado da «' + p.decision_recalculada + '» (ROIC ' + pct(p.roic) + ' frente a WACC ' + pct(p.wacc) + ').', href: '#/analisis/proyectos',
         plan: { title: 'Revisar la propuesta ' + p.id + ' de ' + countryName(p.site) + ' antes de aprobarla', owner: ownerOf(p.site), effect: 'Decisión recalculada: «' + p.decision_recalculada + '». Inversión ' + usdM(p.investment_usd) + '.' } });
     });
     destroyers.forEach(function (c) {
       var x = cos[c];
-      list.push({ title: countryName(c) + ' destruye valor', text: 'EVA ' + usdM(x.eva) + ': su ROIC de ' + pct(x.roic) + ' queda bajo su WACC de ' + pct(x.wacc) + '.', href: '#/resultado/tablero',
+      list.push({ title: countryName(c) + ' destruye valor', text: 'EVA ' + usdM(x.eva) + ': su ROIC de ' + pct(x.roic) + ' queda bajo su WACC de ' + pct(x.wacc) + '.', href: '#/inicio',
         plan: { title: 'Plan para que ' + countryName(c) + ' vuelva a crear valor', owner: ownerOf(c), effect: 'Llevar el ROIC de ' + pct(x.roic) + ' por encima del WACC de ' + pct(x.wacc) + ' (EVA hoy ' + usdM(x.eva) + ').' } });
     });
-    arr(D.S && D.S.decisions).forEach(function (d) { if (d.rule === 'ic_sin_conciliar' || d.rule === 'criticos_abiertos') list.push({ title: d.rule === 'ic_sin_conciliar' ? 'Intercompañía sin conciliar' : 'Errores críticos abiertos', text: d.text, href: caps().corp ? (d.rule === 'ic_sin_conciliar' ? '#/consolidar' : '#/revisar') : null }); });
+    arr(D.S && D.S.decisions).forEach(function (d) { if (d.rule === 'ic_sin_conciliar' || d.rule === 'criticos_abiertos') list.push({ title: d.rule === 'ic_sin_conciliar' ? 'Intercompañía sin conciliar' : 'Errores críticos abiertos', text: d.text, href: caps().corp ? (d.rule === 'ic_sin_conciliar' ? '#/analisis/consolidacion' : '#/proceso') : null }); });
     if (!list.length) { add(cd, note('ok', 'check', null, 'No hay decisiones pendientes: las propuestas se sostienen y todas las sedes crean valor.')); return cd; }
     add(cd, h('ul', { class: 'pending' }, list.map(function (x) {
       return h('li', {}, h('div', {}, h('b', { text: x.title }), h('span', { text: x.text })),
@@ -1109,13 +1250,13 @@
       h('span', { class: 'strip-i' }, icon('calendar', 15), h('span', { text: versionLabel(key) })),
       h('span', { class: 'strip-i' }, icon(consolidated && consolidated === nAll ? 'check' : 'alert', 15), h('span', { text: num(consolidated) + ' de ' + num(nAll) + ' sedes consolidadas · cifras en USD' })),
       prov.length ? tag('Provisional: incluye errores abiertos de ' + prov.map(countryName).join(', '), 'warn') : null,
-      isNum(crit) ? h(caps().corp ? 'a' : 'span', { class: 'strip-i' + (Number(crit) ? ' c-bad' : ''), href: caps().corp ? '#/revisar' : null }, icon(Number(crit) ? 'alert' : 'check', 15), h('span', { text: num(crit) + (Number(crit) === 1 ? ' error crítico encontrado' : ' errores críticos encontrados') })) : null,
+      isNum(crit) ? h(caps().corp ? 'a' : 'span', { class: 'strip-i' + (Number(crit) ? ' c-bad' : ''), href: caps().corp ? '#/proceso' : null }, icon(Number(crit) ? 'alert' : 'check', 15), h('span', { text: num(crit) + (Number(crit) === 1 ? ' error crítico encontrado' : ' errores críticos encontrados') })) : null,
       h('span', { class: 'grow' }),
       h('div', { class: 'strip-sel' }, h('label', { for: 'csl-base', text: 'Comparar con' }), baseSel)));
 
     }
     if (!K || !K.companies) {
-      if (isTop) add(body, note('info', 'info', 'Aún no hay consolidación de ' + versionLabel(key), 'El resultado del grupo aparece cuando el corporativo consolida esta versión.', caps().corp ? h('div', { class: 'acts' }, linkBtn('Ir al paso 3 · Consolidar', '#/consolidar', 'primary small', 'layers')) : null));
+      if (isTop) add(body, note('info', 'info', 'Aún no hay consolidación de ' + versionLabel(key), 'El resultado del grupo aparece cuando el corporativo consolida esta versión.', caps().corp ? h('div', { class: 'acts' }, linkBtn('Ir al paso 3 · Consolidar', '#/analisis/consolidacion', 'primary small', 'layers')) : null));
       else add(body, empty('Sin tablero todavía.', 'Se arma al consolidar la versión.'));
       return;
     }
@@ -1179,7 +1320,7 @@
     if (isBoard) {
     /* ---- quién suma y quién resta valor + crecimiento vs rentabilidad ---- */
     var evaCard = card('Quién suma y quién resta valor', 'EVA ' + versionLabel(key) + ' por sede, US$ millones');
-    var rows = codes.slice().sort(function (a, b) { return cos[b].eva - cos[a].eva; }).map(function (c) { return { label: countryName(c), v: Number(cos[c].eva) || 0, href: '#/resultado/indicadores' }; });
+    var rows = codes.slice().sort(function (a, b) { return cos[b].eva - cos[a].eva; }).map(function (c) { return { label: countryName(c), v: Number(cos[c].eva) || 0, href: '#/analisis/indicadores' }; });
     var elim = (Number(G.eva) || 0) - sumEva;
     add(evaCard, evaBars(rows, elim, Number(G.eva) || 0));
     if (destroyers.length) {
@@ -1201,10 +1342,10 @@
     var lowRot = null, lowMar = null;
     opps.forEach(function (o) { if (o.kind === 'capital') lowRot = o.site; if (o.kind === 'margen') lowMar = o.site; });
     var rkRows = codes.slice().sort(function (a, b) { return (cos[b].roic || 0) - (cos[a].roic || 0); }).map(function (c) {
-      var x = cos[c], o = reasonBy[c], go = function () { location.hash = '#/resultado/indicadores'; };
+      var x = cos[c], o = reasonBy[c], go = function () { location.hash = '#/analisis/indicadores'; };
       var chip = o ? h('span', { class: 'tag t-' + o.chip }, icon(o.icon, 13), h('span', { text: o.reason })) : Number(x.eva) >= 0 ? tag('Crea valor', 'ok') : tag('Destruye valor', 'bad');
       return h('tr', { class: 'click', tabindex: '0', onclick: go, onkeydown: function (e) { if (e.key === 'Enter') go(); } },
-        h('th', { scope: 'row' }, h('a', { href: '#/resultado/indicadores', text: countryName(c) })), tdn(shortM(x.revenue)),
+        h('th', { scope: 'row' }, h('a', { href: '#/analisis/indicadores', text: countryName(c) })), tdn(shortM(x.revenue)),
         tdn(pct(x.roic), Number(x.roic) < Number(x.wacc) ? 'neg' : ''), tdn(pct(x.wacc)), tdn(pct(marginOf(x)), c === lowMar ? 'neg' : ''),
         tdn(times(rotOf(x)), c === lowRot ? 'neg' : ''), tdn(num(wcDays(x))), td(chip));
     });
@@ -1708,7 +1849,7 @@
     if (!VERSION) { noVersion(m, 'Consolidar'); return; }
     var key = VERSION;
     var cbtn = btn('Consolidar', null, 'primary', { disabled: true }, 'layers');
-    add(m, header('Paso 3 de 4 · ' + versionLabel(key), 'Consolidar', 'Une los países en US$ mes a mes, elimina lo que se venden y prestan entre ellos y calcula minoritarios. Toca cualquier cifra para ver de qué archivo, hoja y celda sale.', cbtn));
+    add(m, header(versionLabel(key), 'Consolidación', 'Une los países en US$ mes a mes, elimina lo que se venden y prestan entre ellos y calcula minoritarios. Toca cualquier cifra para ver de qué archivo, hoja y celda sale.', cbtn));
     var body = skel(4); add(m, body);
     var load = function () {
       Promise.all([api('/home' + qs({ version: key })), api('/ic' + qs({ version: key })).catch(function (e) { return { _error: e }; }), api('/rates' + qs({ version: key })).catch(function () { return null; }), maybe(api('/results/latest' + qs({ version: key })))]).then(function (r) {
@@ -1727,11 +1868,11 @@
           h('li', {}, tag(ratesOk ? 'Listo' : 'Falta', ratesOk ? 'ok' : 'bad'), h('span', { text: ratesOk ? 'Tasas oficiales de los 12 meses aprobadas' : 'Faltan tasas oficiales aprobadas' + (missingRates.length ? ' de ' + missingRates.join(', ') : '') + ' (obligatorio para consolidar)' }), !ratesOk && caps().corp ? linkBtn('Editar tasas', '#/reglas', 'link') : null),
           h('li', {}, tag(okPairs === pairs.length ? 'Listo' : 'Revisar', okPairs === pairs.length ? 'ok' : 'warn'), h('span', { text: num(okPairs) + ' de ' + num(pairs.length) + ' operaciones intercompañía cuadran (por mes y tipo)' }))
         ]));
-        add(rd, coGrid(cos, function (co) { return co.upload ? linkBtn(co.upload.status === 'enviado' ? 'Ver revisión' : 'Revisar', '#/revisar/' + co.code, 'ghost small') : linkBtn('Cargar Excel', '#/cargar/' + co.code, 'ghost small', 'upload'); }));
+        add(rd, coGrid(cos, function (co) { return co.upload ? linkBtn(co.upload.status === 'enviado' ? 'Ver revisión' : 'Revisar', '#/proceso/' + co.code, 'ghost small') : linkBtn('Cargar Excel', '#/proceso/' + co.code, 'ghost small', 'upload'); }));
         add(body, rd);
         add(body, ic._error ? card('Conciliación intercompañía').appendChild(errorStateBox(ic._error)).parentNode : icCard(ic, key));
         var R = res && res.result;
-        if (res && R && arr(R.lines).length) { add(body, resultBlock(res, key)); add(body, h('div', { class: 'acts next-bar' }, linkBtn('Siguiente: ver resultado', '#/resultado', 'primary', 'arrowRight'))); }
+        if (res && R && arr(R.lines).length) { add(body, resultBlock(res, key)); add(body, h('div', { class: 'acts next-bar' }, linkBtn('Ver el resultado del grupo', '#/inicio', 'primary', 'arrowRight'))); }
         else add(body, card('Resultado', null).appendChild(empty('Aún no se consolida esta versión.', 'Cuando estén los requisitos, usa el botón Consolidar de arriba.')).parentNode);
       }, function (e) { errorState(body, e, load); });
     };
@@ -1978,7 +2119,7 @@
     co = co && co !== '-' ? co : null;
     add(m, header('Grupo', 'Desviaciones', 'Por qué cambian las ventas entre dos versiones: volumen, precio, tipo de cambio, intercompañía y otros. Baja de grupo a país, a cuenta, a mes y a la celda del Excel.'));
     var sa = versionSelect(a), sb = versionSelect(b, {}, 'Base sugerida');
-    var go = function () { location.hash = '#/resultado/desviaciones/' + sa.value + '/' + (sb.value || '-'); };
+    var go = function () { location.hash = '#/analisis/desviaciones/' + sa.value + '/' + (sb.value || '-'); };
     add(m, h('div', { class: 'card' }, h('div', { class: 'form-row' }, field('Versión comparada (A)', sa), field('Base (B)', sb, 'Sugerida: v2 vs v1, presupuesto vs real anterior, real vs presupuesto.'), btn('Comparar', go, 'primary'))));
     if (a === b) { add(m, note('warn', 'alert', 'Elige dos versiones distintas', 'A y B son la misma versión.')); return; }
     var crumbsBox = h('nav', { 'aria-label': 'Nivel de detalle' });
@@ -1990,7 +2131,7 @@
         ready(body);
         V = V || {};
         var meta = obj(V.meta), La = (obj(meta.a).version || {}).label || versionLabel(a), bKey = (obj(meta.b).version || {}).key || b || V.version_b, Lb = (obj(meta.b).version || {}).label || versionLabel(bKey);
-        var base = '#/resultado/desviaciones/' + a + '/' + (b || '-');
+        var base = '#/analisis/desviaciones/' + a + '/' + (b || '-');
         var crumbs = [['Grupo', base]];
         if (co) crumbs.push([coLabel(co), base + '/' + co]);
         if (acct) crumbs.push([accLabel(acct), base + '/' + (co || '-') + '/' + acct]);
@@ -2003,7 +2144,7 @@
         else if (co) varCompany(body, V, ctx, co);
         else varGroup(body, V, ctx);
       }, function (e) {
-        if (e.status === 404) { ready(body); add(body, empty('Falta consolidar una de las dos versiones.', e.message, caps().corp ? linkBtn('Ir a Consolidación', '#/consolidar', 'primary') : null)); return; }
+        if (e.status === 404) { ready(body); add(body, empty('Falta consolidar una de las dos versiones.', e.message, caps().corp ? linkBtn('Ir a Consolidación', '#/analisis/consolidacion', 'primary') : null)); return; }
         errorState(body, e, load);
       });
     };
@@ -2172,7 +2313,7 @@
       maybe(api('/kpi' + qs({ version: VERSION }))).then(function (K) {
         ready(body);
         if (!K || !K.companies) {
-          add(body, empty('Aún no hay indicadores para ' + versionLabel(VERSION) + '.', 'Se calculan al consolidar.', caps().corp ? linkBtn('Ir a Consolidación', '#/consolidar', 'primary') : null));
+          add(body, empty('Aún no hay indicadores para ' + versionLabel(VERSION) + '.', 'Se calculan al consolidar.', caps().corp ? linkBtn('Ir a Consolidación', '#/analisis/consolidacion', 'primary') : null));
           return;
         }
         var cos = obj(K.companies), G = K.group || {};
@@ -2196,7 +2337,7 @@
         add(body, scenarioCard(K));
         add(body, copiedCard(obj(K.copied)));
         add(body, impactsCard(arr(K.impacts)));
-        add(body, h('div', { class: 'acts' }, linkBtn('Ver propuestas de inversión', '#/resultado/proyectos', 'ghost', 'briefcase'), linkBtn('Ver evolución 2023–2027', '#/resultado/evolutivo', 'ghost', 'trend')));
+        add(body, h('div', { class: 'acts' }, linkBtn('Ver propuestas de inversión', '#/analisis/proyectos', 'ghost', 'briefcase'), linkBtn('Ver evolución 2023–2027', '#/analisis/evolutivo', 'ghost', 'trend')));
       }, function (e) { errorState(body, e, load); });
     };
     load();
@@ -2529,7 +2670,7 @@
         ready(body);
         var Q = r[0] && r[0].history, deliv = r[1];
         if (!Q || !Q.countries) {
-          add(body, note('warn', 'alert', 'El análisis histórico no está disponible por ahora', 'Mientras tanto, revisa los hallazgos de la versión.', h('div', { class: 'acts' }, linkBtn('Ir a hallazgos', '#/revisar', 'small'))));
+          add(body, note('warn', 'alert', 'El análisis histórico no está disponible por ahora', 'Mientras tanto, revisa los hallazgos de la versión.', h('div', { class: 'acts' }, linkBtn('Ir a hallazgos', '#/proceso', 'small'))));
         } else {
           var countries = obj(Q.countries), ranking = arr(Q.ranking).length ? arr(Q.ranking) : Object.keys(countries);
           var rc = card('Ranking por país', 'Primero el país con más hallazgos en esta versión. La tendencia compara con su último ciclo del historial.');
@@ -2784,11 +2925,13 @@
   /** Rutas viejas → lugar nuevo en el flujo de 4 pasos (devuelve el hash nuevo o null). */
   function legacy(p) {
     var k = p[0], rest = p.slice(1).filter(function (x) { return x !== ''; });
-    var to = { hallazgos: '#/revisar', consolidacion: '#/consolidar', indicadores: '#/resultado/indicadores', propuestas: '#/resultado/proyectos', resumen: '#/resultado',
-      acciones: '#/resultado/acciones', evolutivo: '#/resultado/evolutivo', preventivo: '#/resultado/preventivo', demo: '#/datos', calidad: '#/resultado/preventivo', empresas: '#/reglas' }[k];
+    var to = { hallazgos: '#/proceso', consolidacion: '#/analisis/consolidacion', consolidar: '#/analisis/consolidacion', indicadores: '#/analisis/indicadores', propuestas: '#/analisis/proyectos',
+      resumen: '#/inicio', acciones: '#/analisis/acciones', evolutivo: '#/analisis/evolutivo', preventivo: '#/analisis/preventivo', demo: '#/datos', calidad: '#/analisis/preventivo', empresas: '#/reglas' }[k];
     if (to) return to;
-    if (k === 'desviaciones') return '#/resultado/desviaciones' + (rest.length ? '/' + rest.join('/') : '');
-    if (k === 'carga') { var co = companyById(p[1]); return '#/cargar' + (co ? '/' + co.code : ''); }
+    if (k === 'cargar' || k === 'revisar') return '#/proceso' + (rest[0] ? '/' + rest[0] : '');
+    if (k === 'resultado') return rest[0] && rest[0] !== 'tablero' ? '#/analisis/' + rest.join('/') : '#/inicio';
+    if (k === 'desviaciones') return '#/analisis/desviaciones' + (rest.length ? '/' + rest.join('/') : '');
+    if (k === 'carga') { var co = companyById(p[1]); return '#/proceso' + (co ? '/' + co.code : ''); }
     return null;
   }
   function route() {
@@ -2805,20 +2948,18 @@
     window.scrollTo(0, 0);
     // validacion/{id} y enviar/{id}: se busca el país de la subida y se va a «Revisar».
     if ((k === 'validacion' || k === 'enviar') && p[1]) {
-      add(page('revisar'), skel(2));
+      add(page('proceso'), skel(2));
       api('/uploads/' + encodeURIComponent(p[1])).then(function (r) {
         var u = (r && r.upload) || {}, co = companyById(u.company_id);
         if (u.version && u.version !== VERSION && versionByKey(u.version)) setVersion(u.version);
-        location.replace('#/revisar' + (co ? '/' + co.code : u.company ? '/' + u.company : ''));
-      }, function () { location.replace('#/revisar'); });
+        location.replace('#/proceso' + (co ? '/' + co.code : u.company ? '/' + u.company : ''));
+      }, function () { location.replace('#/proceso'); });
       return;
     }
     var views = {
       inicio: [goHome, true],
-      cargar: [function () { viewLoad(p[1]); }, c.country || c.corp],
-      revisar: [function () { viewReview(p[1]); }, c.country || c.corp],
-      consolidar: [viewConsolidation, c.corp],
-      resultado: [function () { viewResult(p[1], p.slice(2)); }, cb],
+      proceso: [function () { viewProcess(p[1]); }, c.country || c.corp],
+      analisis: [function () { viewAnalysis(p[1], p.slice(2)); }, cb],
       reglas: [viewRules, c.corp], perfiles: [function () { viewProfiles(p[1]); }, c.corp],
       bitacora: [function () { viewLog(p[1]); }, c.corp], datos: [viewData, c.corp || c.admin]
     };

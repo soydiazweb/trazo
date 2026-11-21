@@ -230,6 +230,38 @@ class Demo {
 		return $out;
 	}
 
+	/**
+	 * Sube UN archivo de demo (país + versión) desde DATA_DIR por el flujo normal de subida (Data::ingest).
+	 * No aprueba ni envía. Devuelve lo mismo que POST /uploads: {upload, issues}.
+	 */
+	public static function load_one( array $company, string $version_key, int $uid ) {
+		$base  = realpath( self::DATA_DIR );
+		$files = self::files();
+		if ( ! $base || ! $files ) {
+			return new \WP_Error( 'csl_not_found', 'No se encontró la carpeta de datos (' . basename( self::DATA_DIR ) . ') en wp-content o está vacía.', array( 'status' => 404 ) );
+		}
+		if ( ! Store::has_corporate() ) {
+			return new \WP_Error( 'csl_no_corporate', 'Primero hay que importar el archivo corporativo.', array( 'status' => 409 ) );
+		}
+		foreach ( $files as $rel ) {
+			$c = self::classify( $rel, $files );
+			if ( ! $c || ! empty( $c['corporate'] ) || $c['version'] !== $version_key ) {
+				continue;
+			}
+			$co = self::find_company( $c );
+			if ( ! $co || (int) $co['id'] !== (int) $company['id'] ) {
+				continue;
+			}
+			$version = Store::ensure_version( $c['version'], $c['label'], $c['year'] );
+			$res     = Data::ingest( $company, $version, (string) file_get_contents( $base . '/' . $rel ), basename( $rel ), $uid ); // phpcs:ignore
+			if ( ! is_wp_error( $res ) ) {
+				Log::write( 'demo_cargar_uno', 'upload', (int) $res['upload']['id'], array( 'company' => $company['code'], 'version' => $version_key, 'file' => basename( $rel ) ) );
+			}
+			return $res;
+		}
+		return new \WP_Error( 'csl_not_found', 'No hay archivo de demo de ' . $company['country'] . ' para ' . Store::label_for( $version_key ) . ' en la carpeta de datos.', array( 'status' => 404 ) );
+	}
+
 	/** Explica los avisos con un texto de demo, aprueba y envía. */
 	private static function approve_and_send( array $u, int $uid ): array {
 		foreach ( Store::issues_for_upload( $u['id'] ) as $i ) {

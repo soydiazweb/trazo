@@ -610,3 +610,31 @@ details.fold[open] > summary { border-bottom: 1px solid var(--line); margin-bott
 }
 @media print { .flow-top, .tabs, .next-bar { display: none !important; } }
 .kpi span, .kpi small { overflow-wrap: anywhere; }
+
+/* ---------- Proceso por país: línea de 4 pasos ---------- */
+.plist { display: flex; flex-direction: column; gap: 10px; }
+.prow { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(0, 2.4fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.prow-h { display: flex; flex-direction: column; gap: 6px; }
+.prow-h small { display: block; color: var(--muted); font-size: 12px; }
+.prow-a { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.prow-a small { color: var(--muted); font-size: 12px; }
+.ptl { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: none; }
+.ptl li { display: flex; align-items: center; gap: 8px; position: relative; padding-right: 8px; min-width: 0; }
+.ptl li:not(:last-child)::after { content: ''; flex: 1 1 auto; height: 2px; background: var(--line); margin-left: 4px; min-width: 12px; }
+.ptl li.done:not(:last-child)::after { background: var(--ok); }
+.ptl .n { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--font); background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.ptl li.done .n { background: var(--ok); color: #fff; border-color: var(--ok); }
+.ptl li.now .n { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ptl .txt { display: flex; flex-direction: column; min-width: 0; }
+.ptl .txt b { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.ptl li.todo .txt b { color: var(--muted); font-weight: 500; }
+.ptl .txt small { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.ptl.big .n { width: 32px; height: 32px; font-size: 14px; }
+.ptl.big .txt b { font-size: 15px; }
+.sec-h { font-size: 18px; margin: 8px 0 0; }
+@media (max-width: 760px) {
+  .prow { grid-template-columns: 1fr; }
+  .prow-a { flex-direction: row; justify-content: space-between; align-items: center; }
+  .ptl { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 10px; }
+  .ptl li::after { display: none; }
+}

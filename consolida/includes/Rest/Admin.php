@@ -34,6 +34,7 @@ class Admin extends Base {
 		self::route( '/log', 'GET', 'log', 'corp' );
 		self::route( '/demo/load', 'POST', 'demo_load', 'admin' );
 		self::route( '/demo/reset', 'POST', 'demo_reset', 'admin' );
+		self::route( '/demo/load-one', 'POST', 'demo_load_one', 'country_corp' );
 	}
 
 	/* =====================================================================
@@ -559,6 +560,27 @@ class Admin extends Base {
 			fn() => Demo::load( get_current_user_id(), self::bool( $r, 'users' ), self::bool( $r, 'send' ) ),
 			'No se pudo cargar la demo. Revisa el registro del servidor.'
 		);
+	}
+
+	/** POST /demo/load-one {company (código o id), version}: sube el archivo de Meridia de ese país y versión. Corporativo o dueño del país. */
+	public static function demo_load_one( \WP_REST_Request $r ) {
+		$ref = (string) $r->get_param( 'company' );
+		$c   = ctype_digit( $ref ) ? Store::company( (int) $ref ) : Store::company_by_code( strtoupper( sanitize_key( $ref ) ) );
+		if ( ! $c ) {
+			return self::not_found( 'La empresa' );
+		}
+		if ( ! Roles::can_upload( (int) $c['id'] ) ) {
+			return self::deny();
+		}
+		$key = sanitize_key( (string) $r->get_param( 'version' ) );
+		if ( ! Store::valid_key( $key ) ) {
+			return self::err( 'Indica la versión (p. ej. ppto_2027_v1).' );
+		}
+		$v = Store::version( $key );
+		if ( $v && 'cerrado' === $v['status'] ) {
+			return self::err( 'La versión está cerrada: ya no recibe archivos.', 409 );
+		}
+		return self::engine( fn() => Demo::load_one( $c, $key, get_current_user_id() ), 'No se pudo cargar el archivo de demo.' );
 	}
 
 	public static function demo_reset( \WP_REST_Request $r ) {
