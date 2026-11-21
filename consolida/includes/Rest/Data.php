@@ -317,6 +317,7 @@ class Data extends Base {
 				'meta'     => $ds['meta'] ?? array(),
 				'rows'     => $rows,
 				'reported' => $reported,
+				'stats'    => self::dataset_stats( $ds, $u ),
 			);
 		}
 		return array(
@@ -324,6 +325,84 @@ class Data extends Base {
 			'issues'          => Store::issues_for_upload( $u['id'] ),
 			'datasetSummary'  => $summary,
 			'workbookSummary' => $summary,
+		);
+	}
+
+	/**
+	 * Resumen de lo leído para el panel (paso 1 · Cargar): hojas, meses, cuentas del catálogo, ingresos y EBIT del año
+	 * en moneda local y en US$ (tasa promedio oficial de cada mes; null si falta alguna tasa). Solo lectura.
+	 * EBIT = 41xx + 4901 − (51xx + 5901 + 61xx + 6201), como el contrato §10.
+	 */
+	private static function dataset_stats( array $ds, array $u ): array {
+		$cur = strtoupper( (string) ( $ds['meta']['currency'] ?? '' ) );
+		if ( '' === $cur ) {
+			$c   = Store::company( (int) $u['company_id'] );
+			$cur = $c ? strtoupper( (string) $c['currency'] ) : 'USD';
+		}
+		$rates    = (array) ( Store::corporate()['rates'][ $u['version'] ][ $cur ] ?? array() );
+		$months   = array();
+		$accounts = array();
+		$sheets   = array();
+		$rev      = 0.0;
+		$ebit     = 0.0;
+		$rev_usd  = 0.0;
+		$ebit_usd = 0.0;
+		$no_rate  = false;
+		foreach ( array( 'pl', 'bs' ) as $part ) {
+			foreach ( (array) ( $ds[ $part ] ?? array() ) as $r ) {
+				if ( ! is_array( $r ) ) {
+					continue;
+				}
+				$concept = (string) ( $r['concept'] ?? '' );
+				$month   = (int) ( $r['month'] ?? 0 );
+				if ( isset( $r['src']['sheet'] ) ) {
+					$sheets[ (string) $r['src']['sheet'] ] = true;
+				}
+				if ( 'pl' === $part && $month >= 1 && $month <= 12 ) {
+					$months[ $month ] = true;
+				}
+				if ( ! preg_match( '/^\d{4}$/', $concept ) ) {
+					continue;
+				}
+				$accounts[ $concept ] = true;
+				if ( 'pl' !== $part ) {
+					continue;
+				}
+				$sign = 0;
+				if ( preg_match( '/^41\d\d$/', $concept ) || '4901' === $concept ) {
+					$sign = 1;
+				} elseif ( preg_match( '/^(51\d\d|5901|61\d\d|6201)$/', $concept ) ) {
+					$sign = -1;
+				}
+				if ( ! $sign ) {
+					continue;
+				}
+				$v    = is_numeric( $r['value'] ?? null ) ? (float) $r['value'] : 0.0;
+				$rate = 'USD' === $cur ? 1.0 : (float) ( $rates[ $month ]['avg'] ?? 0 );
+				if ( $sign > 0 ) {
+					$rev += $v;
+				}
+				$ebit += $sign * $v;
+				if ( $rate > 0 ) {
+					if ( $sign > 0 ) {
+						$rev_usd += $v / $rate;
+					}
+					$ebit_usd += $sign * $v / $rate;
+				} else {
+					$no_rate = true;
+				}
+			}
+		}
+		ksort( $months );
+		return array(
+			'currency'      => $cur,
+			'months'        => array_keys( $months ),
+			'accounts'      => count( $accounts ),
+			'sheets'        => array_keys( $sheets ),
+			'revenue_local' => $rev,
+			'ebit_local'    => $ebit,
+			'revenue_usd'   => $no_rate ? null : $rev_usd,
+			'ebit_usd'      => $no_rate ? null : $ebit_usd,
 		);
 	}
 

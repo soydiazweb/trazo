@@ -478,6 +478,11 @@ final class Validator {
 						$imp += (float) self::usd( $h['cell']['value'] * ( 1000 ** $h['k'] ) - $h['cell']['value'], $rate );
 					}
 				}
+				// Un saldo de balance de un mes intermedio no entra en los indicadores (capital promedio = saldo inicial y
+				// de diciembre): el error rompe el mes, pero su impacto en US$ no se suma como si fuera real.
+				if ( 'bs' === $part && $m > 0 && $m < 12 ) {
+					$imp = null;
+				}
 				$h0   = $list[0];
 				$word = $h0['k'] > 0 ? 'miles en vez de unidades' : 'unidades en vez de miles';
 				if ( count( $list ) >= 3 ) {

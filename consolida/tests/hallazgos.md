@@ -1,6 +1,6 @@
 # Hallazgos del motor sobre los datos reales del Grupo Meridia
 
-Generado por `php tests/run.php` el 2026-11-21 19:40 UTC con los 21 archivos de `datos-meridia/`. Lectura (Agente R) + reglas, conciliación, consolidación, KPIs y desviaciones (Agente F). Impacto en USD (valor absoluto).
+Generado por `php tests/run.php` el 2026-11-21 20:02 UTC con los 21 archivos de `datos-meridia/`. Lectura (Agente R) + reglas, conciliación, consolidación, KPIs y desviaciones (Agente F). Impacto en USD (valor absoluto).
 
 ## Resumen por versión y categoría
 
@@ -104,7 +104,7 @@ Nota: el historial cuenta errores por país; aquí cada hallazgo intercompañía
 
 | Código | Sev. | Categoría | Hoja | Fila | Col. | Mes | Mensaje | Impacto USD |
 | --- | --- | --- | --- | ---: | --- | --- | --- | ---: |
-| FMT_SCALE_JUMP | critico | formato_escala | balance | 46 | D | abr | En abr, 9 conceptos de balance están unas 1,000 veces fuera de escala frente a los demás meses (p. ej. «Efectivo y equivalentes»: 310,609,304,450 contra 331,392,874): el mes parece cargado en unidades en vez de miles. | 148,322,059,005 |
+| FMT_SCALE_JUMP | critico | formato_escala | balance | 46 | D | abr | En abr, 9 conceptos de balance están unas 1,000 veces fuera de escala frente a los demás meses (p. ej. «Efectivo y equivalentes»: 310,609,304,450 contra 331,392,874): el mes parece cargado en unidades en vez de miles. |  |
 | IC_MISMATCH | critico | intercompania | intercompania | 16 | F | may | En may, MX reporta venta de producto de Bebidas a US por 13,500,000.00 MXN y US reporta 13,500,000.00 USD (diferencia -12,815,492.19 USD). Además, uno lo pacta en MXN y el otro en USD. | 12,815,492 |
 | IC_MISSING | critico | intercompania | intercompania | 23 | F | jul | MX registra venta de producto de Confitería de US en jul a dic (6 meses, 2,400,000.00 USD en total), pero US no lo reporta. | 2,400,000 |
 | FX_USED | critico | tipo_cambio | indicadores_reportados | 13 | B |  | El país usó un tipo de cambio de 18.5000 MXN/USD y la tasa oficial promedio de Presupuesto 2027 v1 es 19.8494 (diferencia 6.8 %). | 141,410 |
