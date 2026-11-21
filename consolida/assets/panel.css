@@ -649,3 +649,14 @@ details.fold[open] > summary { border-bottom: 1px solid var(--line); margin-bott
 .rb-v { display: flex; flex-direction: column; text-align: right; }
 .rb-v small { font-size: 12px; color: var(--muted); }
 @media (max-width: 600px) { .revbars li { grid-template-columns: 90px minmax(0, 1fr); } .rb-v { grid-column: 1 / -1; text-align: left; flex-direction: row; gap: 8px; } }
+
+/* ---------- Proceso de un país: asistente de 4 pasos ---------- */
+.ptl.wiz li a { display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; padding: 6px 8px; border-radius: 10px; min-width: 0; flex: none; }
+.ptl.wiz li a:hover { background: var(--surface-2); }
+.ptl.wiz li.sel a { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
+.simbox { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px dashed var(--accent); border-radius: 12px; background: var(--accent-soft); margin: 4px 0 10px; }
+.simbox b { display: block; }
+.simbox small { color: var(--ink-2); font-size: 13px; }
+.next-bar { display: flex; align-items: center; }
+.next-bar .grow { flex: 1; }
+@media (max-width: 600px) { .simbox { flex-direction: column; align-items: stretch; } }

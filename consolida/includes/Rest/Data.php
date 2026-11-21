@@ -31,6 +31,7 @@ class Data extends Base {
 		self::route( '/uploads/(?P<id>\d+)/approve', 'POST', 'upload_approve' );
 		self::route( '/uploads/(?P<id>\d+)/send', 'POST', 'upload_send' );
 		self::route( '/issues/(?P<id>\d+)/explain', 'POST', 'issue_explain' );
+		self::route( '/uploads/(?P<id>\d+)/simulate-fix', 'POST', 'upload_simulate_fix', 'country_corp' );
 	}
 
 	/* =====================================================================
@@ -466,7 +467,7 @@ class Data extends Base {
 		$crit = 0;
 		$open = 0;
 		foreach ( Store::issues_for_upload( $u['id'] ) as $i ) {
-			if ( 'critico' === $i['severity'] ) {
+			if ( 'critico' === $i['severity'] && 'corregida' !== $i['status'] ) {
 				++$crit;
 			} elseif ( 'abierta' === $i['status'] ) {
 				++$open;
@@ -509,6 +510,38 @@ class Data extends Base {
 			return self::err( 'Confirma la aprobación (confirm: true).' );
 		}
 		return self::do_approve( $u['id'], get_current_user_id() );
+	}
+
+	/**
+	 * Demo: simula que el país resolvió los hallazgos de su archivo (críticos → «corregida», avisos → «explicada») para
+	 * poder avanzar al envío. Los números del archivo no cambian: para cifras corregidas se carga la versión corregida.
+	 */
+	public static function upload_simulate_fix( \WP_REST_Request $r ) {
+		$u = self::upload_or_deny( self::int( $r, 'id' ), 'file' );
+		if ( is_wp_error( $u ) ) {
+			return $u;
+		}
+		if ( $u['superseded'] ) {
+			return self::err( 'Esta subida fue reemplazada por una más nueva.', 409 );
+		}
+		if ( in_array( $u['status'], array( 'aprobado', 'enviado' ), true ) ) {
+			return self::err( 'La subida ya está aprobada o enviada.', 409 );
+		}
+		$n = 0;
+		foreach ( Store::issues_for_upload( $u['id'] ) as $i ) {
+			if ( 'abierta' !== $i['status'] ) {
+				continue;
+			}
+			if ( 'critico' === $i['severity'] ) {
+				Store::update_issue( $i['id'], 'corregida', 'Simulación del demo: el país corrigió este error en su Excel.' );
+			} else {
+				Store::update_issue( $i['id'], 'explicada', 'Simulación del demo: el país explicó este aviso.' );
+			}
+			++$n;
+		}
+		Store::update_upload( $u['id'], array( 'status' => 'validado', 'criticals' => 0 ) );
+		Log::write( 'simular_correccion', 'upload', $u['id'], array( 'company_id' => $u['company_id'], 'version' => $u['version'], 'hallazgos' => $n ) );
+		return array( 'upload' => self::upload_out( Store::upload( $u['id'] ) ), 'resolved' => $n );
 	}
 
 	public static function upload_send( \WP_REST_Request $r ) {

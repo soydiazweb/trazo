@@ -320,6 +320,7 @@
     swap: [['path', { d: 'M4 8h13l-3-3' }], ['path', { d: 'M20 16H7l3 3' }]],
     gear: [['circle', { cx: '12', cy: '12', r: '3' }], ['path', { d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' }]],
     arrowRight: [['path', { d: 'M5 12h14' }], ['path', { d: 'M13 6l6 6-6 6' }]],
+    arrowLeft: [['path', { d: 'M19 12H5' }], ['path', { d: 'M11 6l-6 6 6 6' }]],
     sliders: [['path', { d: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0' }], ['circle', { cx: '16', cy: '6', r: '2' }], ['circle', { cx: '10', cy: '12', r: '2' }], ['circle', { cx: '18', cy: '18', r: '2' }]]
   };
   function icon(name, size) {
@@ -993,12 +994,12 @@
         h('span', { class: 'txt' }, h('b', { text: st[0] }), big ? h('small', { text: st[1] }) : null));
     }));
   }
-  function viewProcess(code) {
+  function viewProcess(code, stepArg) {
     var m = page('proceso');
     if (!VERSION) { noVersion(m, 'Proceso por país'); return; }
     var r0 = resolveCountry(code), co = r0.co;
     if (r0.denied) { add(m, header(null, 'Proceso por país')); add(m, empty('No tienes acceso a ese país.', 'Elige uno de tus países.', linkBtn('Ver mis países', '#/proceso', 'primary'))); return; }
-    if (co) processOne(m, co, r0.many || caps().corp); else processList(m);
+    if (co) processOne(m, co, r0.many || caps().corp, stepArg); else processList(m);
   }
   function processList(m) {
     add(m, header(versionLabel(VERSION), 'Proceso por país', 'Cada país sigue 4 pasos: carga su Excel, el sistema lo revisa, el país lo envía y el corporativo consolida. Abre un país para ver sus cargas o hacer una nueva.'));
@@ -1035,67 +1036,96 @@
     };
     load();
   }
-  function processOne(m, co, many) {
-    add(m, header(versionLabel(VERSION), 'Proceso · ' + coLabel(co.code), 'Carga, revisión y envío del Excel de ' + (co.country || co.name) + '.', many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
+  /** Un país como asistente de 4 pasos: se ve un paso a la vez, con su botón de simulación para avanzar. */
+  function processOne(m, co, many, stepArg) {
+    add(m, header(versionLabel(VERSION), 'Proceso · ' + coLabel(co.code), 'Un paso a la vez. Cada paso tiene un botón «Simular» para resolverlo y avanzar, o puedes hacerlo de verdad (subir, corregir, enviar).', many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
     var body = skel(3); add(m, body);
+    var go = function (n) { location.hash = '#/proceso/' + co.code + '/' + n; };
     var load = function () {
       api('/home' + qs({ version: VERSION })).then(function (H) {
         H = H || {};
-        var cur = arr(H.companies).filter(function (x) { return x.code === co.code; })[0] || {}, u = cur.upload;
+        var list = arr(H.companies), cur = list.filter(function (x) { return x.code === co.code; })[0] || {}, u = cur.upload;
+        var f = processFlags(u, H), now = f.indexOf(false), active = isNum(stepArg) && stepArg >= 1 && stepArg <= 4 ? Number(stepArg) : (now < 0 ? 4 : now + 1);
+        var canUp = caps().corp || ownsCompany(co.id);
         return Promise.all([
-          api('/uploads' + qs({ company: co.id, version: VERSION })).catch(function () { return []; }),
-          u ? api('/uploads/' + u.id) : null,
-          u ? api('/findings' + qs({ version: VERSION, company: co.code })).catch(function () { return null; }) : null,
-          H.lastResult && (caps().corp || caps().board) ? maybe(api('/kpi' + qs({ version: VERSION }))).catch(function () { return null; }) : null
+          u && (active === 1 || active === 2) ? api('/uploads/' + u.id) : null,
+          u && active === 2 ? api('/findings' + qs({ version: VERSION, company: co.code })).catch(function () { return null; }) : null,
+          active === 1 ? api('/uploads' + qs({ company: co.id, version: VERSION })).catch(function () { return []; }) : null,
+          active === 4 && H.lastResult && (caps().corp || caps().board) ? maybe(api('/kpi' + qs({ version: VERSION }))).catch(function () { return null; }) : null
         ]).then(function (r) {
           ready(body);
-          var f = processFlags(u, H);
-          var tl = card('Dónde va ' + (co.country || co.code), null, loadTag(u));
-          add(tl, timeline(f, true));
-          add(body, tl);
-          // Paso 1 · cargar: nueva carga, simulación y lo que leyó el sistema.
-          var canUp = caps().corp || ownsCompany(co.id);
-          if (canUp) {
-            var sim = card('¿Quieres ver el proceso con datos reales?', 'Carga el archivo de Meridia de ' + (co.country || co.code) + ' para ' + versionLabel(VERSION) + ' que está en el servidor y recorre los pasos.');
-            var sb = btn('Simular con el archivo de Meridia', function () {
-              busy(sb, post('/demo/load-one', { company: co.code, version: VERSION })).then(function (res) {
-                var iss = arr(res && res.issues), crit = iss.filter(function (i) { return i.severity === 'critico'; }).length;
-                toast('Archivo de Meridia cargado: ' + num(crit) + ' error(es) crítico(s) y ' + num(iss.length - crit) + ' aviso(s).', crit ? 'bad' : 'ok');
-                DASH_CACHE = null; load();
+          // Pasos clicables.
+          var nav = h('ol', { class: 'ptl big wiz', 'aria-label': 'Pasos de ' + (co.country || co.code) }, PSTEPS.map(function (st, i) {
+            var cls = (f[i] ? 'done' : i === now ? 'now' : 'todo') + (i + 1 === active ? ' sel' : '');
+            return h('li', { class: cls }, h('a', { href: '#/proceso/' + co.code + '/' + (i + 1), 'aria-current': i + 1 === active ? 'step' : null },
+              h('span', { class: 'n', 'aria-hidden': 'true' }, f[i] ? icon('check', 14) : String(i + 1)),
+              h('span', { class: 'txt' }, h('b', { text: (i + 1) + ' · ' + st[0] }), h('small', { text: st[1] }))));
+          }));
+          add(body, h('section', { class: 'card' }, nav));
+          var box = h('div', { class: 'stack' }); add(body, box);
+          var simBtn = function (label, fn, primary) { var b0 = btn(label, function () { fn(b0); }, primary ? 'primary' : 'ghost', {}, 'database'); return b0; };
+          var sim = function (title, text, button) { return h('div', { class: 'simbox' }, h('div', {}, h('b', { text: title }), h('small', { text: text })), button); };
+          var nextBar = function (canNext) {
+            return h('div', { class: 'acts next-bar' }, active > 1 ? btn('Paso anterior', function () { go(active - 1); }, 'ghost', {}, 'arrowLeft') : null, h('span', { class: 'grow' }),
+              active < 4 ? btn('Siguiente paso', function () { go(active + 1); }, canNext ? 'primary' : 'ghost', {}, 'arrowRight') : linkBtn('Ver el resultado del grupo', '#/inicio', 'primary', 'arrowRight'));
+          };
+          if (active === 1) {
+            var cd1 = card('Paso 1 · Cargar el Excel de ' + (co.country || co.code), u ? 'Archivo cargado: ' + dt(u.uploaded_at) : 'Aún no hay archivo en ' + versionLabel(VERSION), loadTag(u));
+            if (canUp) add(cd1, sim('Simular la carga', 'Usa el archivo de Meridia de ' + (co.country || co.code) + ' que está en el servidor.', simBtn(u ? 'Volver a cargar' : 'Simular carga', function (b0) {
+              busy(b0, post('/demo/load-one', { company: co.code, version: VERSION })).then(function (res) {
+                var crit = arr(res && res.issues).filter(function (i) { return i.severity === 'critico'; }).length;
+                toast('Archivo cargado: ' + num(crit) + ' error(es) crítico(s).', crit ? 'bad' : 'ok'); DASH_CACHE = null; load();
               }, fail);
-            }, 'ghost', {}, 'database');
-            add(sim, h('div', { class: 'acts' }, sb));
-            add(body, sim);
-          }
-          loadOne(body, co, u, load);
-          // Cargas anteriores.
-          var hist = arr(r[0]);
-          var hc = card('Cargas de ' + (co.country || co.code) + ' en ' + versionLabel(VERSION), hist.length ? num(hist.length) + ' carga(s); la vigente es la que cuenta' : 'Aún no hay cargas');
-          if (hist.length) {
-            add(hc, table([['Fecha'], ['Archivo'], ['Críticos', 'num'], ['Avisos', 'num'], ['Estado'], ['']], hist.map(function (x) {
-              return h('tr', {}, td(dt(x.uploaded_at)), td(x.file_name || ''), tdn(num(x.criticals)), tdn(num(x.warnings)),
-                h('td', {}, Number(x.superseded) ? tag('Reemplazada', 'neutral') : loadTag(x)),
-                h('td', {}, Number(x.superseded) ? null : h('small', { text: 'Vigente' })));
-            }), { caption: 'Cargas del país', cards: true }));
-          }
-          add(body, hc);
-          // Pasos 2 y 3 · revisar y enviar.
-          var rev = h('section', { id: 'csl-review', class: 'stack', 'aria-label': 'Revisión y envío' });
-          add(rev, h('h2', { class: 'sec-h', text: 'Revisar y enviar' }));
-          if (r[1]) reviewOne(rev, co, r[1], r[2], load);
-          else add(rev, empty('Cuando cargues el archivo verás aquí sus errores y podrás enviarlo.', null));
-          add(body, rev);
-          // Paso 4 · su aporte al grupo.
-          var K = r[3], kc = K && K.companies ? K.companies[co.code] : null;
-          if (kc) {
-            var ac = card('Paso 4 · Lo que aporta al grupo', 'En la última consolidación de ' + versionLabel(VERSION) + ', en US$');
-            add(ac, h('div', { class: 'kpis' }, [
-              kpi('EBIT', usdM(kc.ebit)), kpi('ROIC', pct(kc.roic), null, 'WACC ' + pct(kc.wacc)),
-              kpi('EVA', usdM(kc.eva), Number(kc.eva) < 0 ? 'bad' : 'ok', Number(kc.eva) < 0 ? 'Destruye valor' : 'Crea valor'),
-              kpi('Capital invertido', usdM(kc.ci))
+            }, !u)));
+            add(box, cd1);
+            var up = h('div', { class: 'stack' });
+            loadOne(up, co, u, load);
+            add(box, h('details', { class: 'more', open: !u ? null : true }, h('summary', { text: u ? 'Lo que leyó el sistema y subir otro archivo' : 'O sube un Excel desde tu computadora' }), up));
+            var hist = arr(r[2]);
+            if (hist.length > 1) add(box, h('details', { class: 'more' }, h('summary', { text: 'Cargas anteriores (' + num(hist.length) + ')' }),
+              table([['Fecha'], ['Archivo'], ['Críticos', 'num'], ['Avisos', 'num'], ['Estado']], hist.map(function (x) {
+                return h('tr', {}, td(dt(x.uploaded_at)), td(x.file_name || ''), tdn(num(x.criticals)), tdn(num(x.warnings)), h('td', {}, Number(x.superseded) ? tag('Reemplazada', 'neutral') : loadTag(x)));
+              }), { caption: 'Cargas del país', cards: true })));
+            add(box, nextBar(!!u));
+          } else if (active === 2) {
+            var cd2 = card('Paso 2 · Revisar los errores', u ? num(u.criticals) + ' críticos y ' + num(u.warnings) + ' avisos en el archivo' : 'Primero carga el archivo', loadTag(u));
+            if (!u) { add(cd2, empty('Aún no hay archivo.', 'Ve al paso 1 y carga el Excel.', btn('Ir al paso 1', function () { go(1); }, 'primary', {}, 'arrowLeft'))); add(box, cd2); return; }
+            if (canUp && (Number(u.criticals) || u.status === 'con_avisos')) add(cd2, sim('Simular que el país lo resolvió', 'Marca los errores como corregidos y los avisos como explicados para poder enviar. Las cifras del archivo no cambian: para cifras corregidas usa la versión v2.', simBtn('Simular corrección', function (b0) {
+              busy(b0, post('/uploads/' + u.id + '/simulate-fix', {})).then(function (res) { toast(num(res && res.resolved) + ' hallazgo(s) resueltos. Ya puedes enviar.', 'ok'); DASH_CACHE = null; go(3); }, fail);
+            }, true)));
+            else add(cd2, note('ok', 'check', 'Sin errores críticos pendientes', 'Puedes pasar al paso 3 y enviar.'));
+            add(box, cd2);
+            var rev = h('div', { class: 'stack' });
+            if (r[0]) reviewOne(rev, co, r[0], r[1], load);
+            add(box, h('details', { class: 'more', open: Number(u.criticals) ? true : null }, h('summary', { text: 'Ver cada error con su hoja y celda' }), rev));
+            add(box, nextBar(!Number(u.criticals)));
+          } else if (active === 3) {
+            var cd3 = card('Paso 3 · Aprobar y enviar al corporativo', u ? (u.status === 'enviado' ? 'Enviado el ' + dt(u.sent_at) : 'Estado: ' + (LOAD_ST[u.status] || [u.status])[0]) : 'Primero carga el archivo', loadTag(u));
+            if (!u) add(cd3, empty('Aún no hay archivo.', 'Ve al paso 1.', btn('Ir al paso 1', function () { go(1); }, 'primary', {}, 'arrowLeft')));
+            else if (u.status === 'enviado') add(cd3, note('ok', 'check', (co.country || co.code) + ' ya envió su archivo', 'El corporativo lo incluye al consolidar.'));
+            else if (Number(u.criticals)) add(cd3, note('bad', 'alert', 'Hay ' + num(u.criticals) + ' errores críticos', 'No se puede enviar hasta resolverlos en el paso 2.', btn('Ir al paso 2', function () { go(2); }, 'primary', {}, 'arrowLeft')));
+            else if (ownsCompany(co.id)) add(cd3, sim('Aprobar y enviar', 'El responsable del país confirma que los datos están bien y los envía al corporativo.', simBtn('Aprobar y enviar', function (b0) {
+              var p0 = u.status === 'aprobado' ? Promise.resolve() : post('/uploads/' + u.id + '/approve', { confirm: true });
+              busy(b0, p0.then(function () { return post('/uploads/' + u.id + '/send', {}); })).then(function () { toast((co.country || co.code) + ' enviado al corporativo.', 'ok'); DASH_CACHE = null; go(4); }, fail);
+            }, true)));
+            else add(cd3, note('info', 'info', null, 'Solo el responsable de datos del país puede aprobar y enviar.'));
+            add(box, cd3);
+            add(box, nextBar(u && u.status === 'enviado'));
+          } else {
+            var sent = list.filter(function (x) { return x.upload && x.upload.status === 'enviado'; }).length;
+            var cd4 = card('Paso 4 · Consolidar el grupo', H.lastResult ? 'Última consolidación: ' + dt(H.lastResult.created_at) : 'Aún no se consolida ' + versionLabel(VERSION));
+            add(cd4, h('p', { class: 'muted', text: num(sent) + ' de ' + num(list.length) + ' países enviados. ' + (u && u.status === 'enviado' ? (co.country || co.code) + ' ya está incluido.' : (co.country || co.code) + ' aún no envía: se incluye solo en una consolidación provisional.') }));
+            if (caps().corp) add(cd4, sim('Consolidar', sent === list.length ? 'Une los países en US$ y calcula el resultado del grupo.' : 'Faltan países por enviar: se consolida de forma provisional con lo que hay.', simBtn(sent === list.length ? 'Consolidar' : 'Consolidar provisional', function (b0) {
+              busy(b0, post('/consolidate', { version: VERSION, force: sent !== list.length })).then(function () { toast('Consolidado.', 'ok'); DASH_CACHE = null; load(); }, fail);
+            }, true)));
+            else add(cd4, note('info', 'info', null, 'El corporativo consolida cuando los países envían.'));
+            var K = r[3], kc = K && K.companies ? K.companies[co.code] : null;
+            if (kc) add(cd4, h('div', { class: 'kpis' }, [
+              kpi('EBIT de ' + (co.country || co.code), usdM(kc.ebit)), kpi('ROIC', pct(kc.roic), null, 'WACC ' + pct(kc.wacc)),
+              kpi('EVA', usdM(kc.eva), Number(kc.eva) < 0 ? 'bad' : 'ok', Number(kc.eva) < 0 ? 'Destruye valor' : 'Crea valor'), kpi('Capital invertido', usdM(kc.ci))
             ]));
-            add(ac, h('div', { class: 'acts' }, linkBtn('Ver el resultado del grupo', '#/inicio', 'ghost', 'arrowRight')));
-            add(body, ac);
+            add(box, cd4);
+            add(box, nextBar(true));
           }
         });
       }).catch(function (e) { ready(body); errorState(body, e, load); });
@@ -3096,7 +3126,7 @@
     }
     var views = {
       inicio: [goHome, true],
-      proceso: [function () { viewProcess(p[1]); }, c.country || c.corp],
+      proceso: [function () { viewProcess(p[1], isNum(p[2]) ? Number(p[2]) : null); }, c.country || c.corp],
       analisis: [function () { viewAnalysis(p[1], p.slice(2)); }, cb],
       reglas: [viewRules, c.corp], perfiles: [function () { viewProfiles(p[1]); }, c.corp],
       bitacora: [function () { viewLog(p[1]); }, c.corp], datos: [viewData, c.corp || c.admin]
