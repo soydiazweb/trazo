@@ -3,7 +3,7 @@
  * Plugin Name: Trazo – Consolidación multiempresa
  * Plugin URI:  https://www.soydiaz.com
  * Description: Trazo consolida el presupuesto de un grupo de empresas en varias monedas a partir de un Excel por país: valida, elimina lo intercompañía, explica desviaciones y calcula ROIC, ROCE y EVA. Panel privado en /trazo/.
- * Version:     0.7.0
+ * Version:     0.7.1
  * Author:      Jonathan Diaz
  * Author URI:  https://www.soydiaz.com
  * Requires PHP: 8.1
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CSL_VERSION', '0.7.0' );
+define( 'CSL_VERSION', '0.7.1' );
 define( 'CSL_FILE', __FILE__ );
 define( 'CSL_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CSL_URL', plugin_dir_url( __FILE__ ) );

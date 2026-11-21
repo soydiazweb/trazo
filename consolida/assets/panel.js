@@ -689,7 +689,7 @@
     if (!VERSION) { noVersion(m, 'Inicio'); return; }
     var key = VERSION, chosen = RESULT_BASE[key];
     var base = chosen === '-' ? null : chosen && chosen !== key && versionByKey(chosen) ? chosen : baseFor(key);
-    add(m, header(versionLabel(key), 'Resultado del grupo', 'Los 5 países unidos como un solo corporativo, en US$. Arriba lo principal; abajo, la IA sugiere mejoras y las pestañas muestran cada resultado.'));
+    add(m, header(versionLabel(key), 'Resultado del grupo'));
     var top = skel(3); add(m, top);
     var rest = h('div', { class: 'stack' }); add(m, rest);
     var load = function () {
@@ -709,6 +709,8 @@
         var pick = function (t) { var x = cardsBy[t]; if (x && x.parentNode) x.parentNode.removeChild(x); return x || null; };
         // Franja, frase y 5 indicadores (lo que queda de la parte de arriba).
         var errs = pick('Los errores que más pesan'), pend = pick('Decisiones pendientes');
+        // Sin el texto largo del resumen: solo la franja, los indicadores y los gráficos.
+        Array.prototype.forEach.call(tmpTop.querySelectorAll('.lead-card'), function (x) { x.remove(); });
         Array.prototype.forEach.call(tmpTop.children, function (x) { add(top, x); });
         // Gráficos principales.
         add(top, h('div', { class: 'dash-2' }, pick('Quién suma y quién resta valor'), pick('Por qué cambian las ventas del grupo')));
