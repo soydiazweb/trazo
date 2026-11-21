@@ -551,9 +551,10 @@
     return [
       [null, [['inicio', cb ? 'Inicio · resultado del grupo' : 'Inicio', 'home', true],
         ['proceso', 'Proceso por país', 'upload', c.country || c.corp],
-        ['analisis', 'Análisis', 'chart', cb]]],
+        ['analisis', 'Análisis', 'chart', cb],
+        ['datos', 'Demo guiado', 'database', c.corp || c.admin]]],
       ['Configuración', [['reglas', 'Reglas y tasas', 'percent', c.corp], ['perfiles', 'Perfiles de lectura', 'sliders', c.corp],
-        ['bitacora', 'Bitácora', 'log', c.corp], ['datos', 'Datos y demo', 'database', c.corp || c.admin]]]
+        ['bitacora', 'Bitácora', 'log', c.corp]]]
     ];
   }
   function setNav(open) { app.classList.toggle('nav-open', open); var b = app.querySelector('.menu-btn'); if (b) b.setAttribute('aria-expanded', String(open)); }
@@ -649,7 +650,7 @@
     api('/home' + qs({ version: v })).then(function (H) { if (v === VERSION) { STEP_STATE = H; drawSteps(); } }, function () { /* la barra queda sin estado */ });
   }
   function refreshScore() { refreshSteps(); }
-  var TITLES = { inicio: 'Inicio', proceso: 'Proceso por país', analisis: 'Análisis', cargar: 'Cargar', revisar: 'Revisar', consolidar: 'Consolidar', resultado: 'Resultado', reglas: 'Reglas y tasas', perfiles: 'Perfiles de lectura', bitacora: 'Bitácora', datos: 'Datos y demo' };
+  var TITLES = { inicio: 'Inicio', proceso: 'Proceso por país', analisis: 'Análisis', cargar: 'Cargar', revisar: 'Revisar', consolidar: 'Consolidar', resultado: 'Resultado', reglas: 'Reglas y tasas', perfiles: 'Perfiles de lectura', bitacora: 'Bitácora', datos: 'Demo guiado' };
   var STEP_OF = {};
   var NAV_OF = { cargar: 'proceso', revisar: 'proceso', proceso: 'proceso', consolidar: 'analisis', resultado: 'inicio', analisis: 'analisis' };
   function page(key, navKey) {
@@ -667,7 +668,7 @@
   window.addEventListener('beforeunload', function (e) { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
   function noVersion(m, title) {
     add(m, header(null, title));
-    add(m, empty('Aún no hay versiones de presupuesto.', caps().corp ? 'Importa el archivo corporativo en Ajustes › Datos y demo.' : 'El equipo corporativo debe importar los datos.', caps().corp || caps().admin ? linkBtn('Ir a Datos y demo', '#/datos', 'primary') : null));
+    add(m, empty('Aún no hay versiones de presupuesto.', caps().corp ? 'Importa el archivo corporativo en Configuración › Demo guiado.' : 'El equipo corporativo debe importar los datos.', caps().corp || caps().admin ? linkBtn('Ir al demo guiado', '#/datos', 'primary') : null));
   }
   /** Dentro de una pestaña, los h1 de las vistas reutilizadas pasan a h2 (un solo h1 por página). */
   function demoteHeadings(host) {
@@ -748,7 +749,7 @@
         h('div', { class: 'acts' }, linkBtn('Empezar con ' + (first.country || first.name), '#/proceso/' + first.code, 'primary', 'upload'))));
     }
     var cd = card('Países', versionLabel(VERSION) + ' · toca un país para subir o ver su archivo');
-    if (!list.length) add(cd, empty('No hay países.', 'Importa el archivo corporativo en Ajustes › Datos y demo.'));
+    if (!list.length) add(cd, empty('No hay países.', 'Importa el archivo corporativo en Configuración › Demo guiado.'));
     add(cd, h('div', { class: 'cos' }, list.map(function (co) {
       var u = co.upload, st = u ? (LOAD_ST[u.status] || [u.status, 'neutral']) : ['Sin cargar', 'neutral'];
       return h('article', { class: 'co ' + st[1], 'aria-label': (co.country || co.name) + ': ' + st[0] },
@@ -1563,9 +1564,9 @@
     var cd = card('Aún no hay datos', null);
     add(cd, note('info', 'info', 'Falta importar los datos del Grupo Meridia',
       c.admin ? 'Importa el archivo corporativo y los 20 archivos de país que están en el servidor. Pasan por el mismo flujo de lectura y validación que una carga normal.'
-        : c.corp ? 'Importa el archivo corporativo (países, tasas, catálogo e historial) en «Datos y demo».' : 'El equipo corporativo debe importar los datos antes de que puedas cargar tu archivo.'));
+        : c.corp ? 'Importa el archivo corporativo (países, tasas, catálogo e historial) en «Demo guiado».' : 'El equipo corporativo debe importar los datos antes de que puedas cargar tu archivo.'));
     if (c.admin) add(cd, h('div', { class: 'acts' }, btn('Importar datos de Meridia', function (e) { importMeridia(e.currentTarget); }, 'primary', {}, 'database')));
-    else if (c.corp) add(cd, h('div', { class: 'acts' }, linkBtn('Ir a Datos y demo', '#/datos', 'primary', 'database')));
+    else if (c.corp) add(cd, h('div', { class: 'acts' }, linkBtn('Ir al demo guiado', '#/datos', 'primary', 'database')));
     return cd;
   }
   function meridiaCard() {
@@ -1821,7 +1822,7 @@
     var list = companies.length ? companies : META.companies;
     var cd = card('Parámetros por país', 'Del archivo corporativo (parametros_paises). El WACC se compara con el ROIC; la participación define los minoritarios.',
       btn('Nuevo país', function () { companyForm(null, users, reload); }, 'ghost small', {}, 'plus'));
-    if (!list.length) { add(cd, empty('No hay países.', 'Importa el archivo corporativo en «Datos y demo».')); return cd; }
+    if (!list.length) { add(cd, empty('No hay países.', 'Importa el archivo corporativo en «Demo guiado».')); return cd; }
     add(cd, table([['País'], ['Moneda'], ['Escala del archivo'], ['Participación del grupo', 'num'], ['Socio minoritario'], ['Impuesto', 'num'], ['WACC', 'num'], ['Responsable de datos'], ['Usuarios'], ['']], list.map(function (c) {
       var us = arr(c.users).map(function (u) { return typeof u === 'object' ? (u.name || '#' + u.id) : '#' + u; }).join(', ');
       return h('tr', {}, h('th', { scope: 'row' }, h('b', { text: coLabel(c.code) }), h('small', { text: c.name })), td(c.currency || '—'), td(c.scale || '—'),
@@ -2776,7 +2777,7 @@
       api('/profiles').then(function (list) {
         ready(body);
         list = arr(list);
-        if (!list.length) { add(body, empty('No hay países.', 'Importa el archivo corporativo en «Datos y demo».')); return; }
+        if (!list.length) { add(body, empty('No hay países.', 'Importa el archivo corporativo en «Demo guiado».')); return; }
         var cur = list.filter(function (p) { return p.code === code; })[0] || list[0];
         add(body, h('div', { class: 'card' }, h('div', { class: 'filters' }, field('País', select(list.map(function (p) { return [p.code, coLabel(p.code)]; }), cur.code, { onchange: function (e) {
           if (DIRTY && !confirm('Hay cambios sin guardar en el perfil. ¿Cambiar de país sin guardar?')) { e.target.value = cur.code; return; }
@@ -2927,45 +2928,132 @@
   /* =====================================================================
      Datos y demo (importar corporativo, datos de Meridia, reiniciar)
      ===================================================================== */
+  /* =====================================================================
+     Demo guiado: el ciclo de presupuesto de Meridia paso a paso con los archivos del servidor
+     ===================================================================== */
+  var DEMO_V1 = 'ppto_2027_v1', DEMO_V2 = 'ppto_2027_v2';
   function viewData() {
     var m = page('datos'), c = caps();
-    add(m, header('Apoyo', 'Datos y demo', 'Importa el archivo corporativo del grupo y, como administrador, los archivos reales de los 5 países que están en el servidor.'));
-    var cf = META.corporateFile;
+    add(m, header('Demo', 'Demo guiado', 'Recorre el ciclo de presupuesto del Grupo Meridia paso a paso con los archivos reales del reto que ya están en el servidor. Sigue los pasos en orden; cada uno dice qué hace y qué vas a ver.'));
+    var body = skel(3); add(m, body);
+    var load = function () {
+      if (!META.hasCorporate || !versionByKey(DEMO_V1)) { ready(body); demoStart(body, load, false); return; }
+      Promise.all([api('/home' + qs({ version: DEMO_V1 })), versionByKey(DEMO_V2) ? api('/home' + qs({ version: DEMO_V2 })) : null]).then(function (r) {
+        ready(body);
+        demoStart(body, load, true);
+        demoSteps(body, r[0] || {}, r[1] || {}, load);
+      }, function (e) { errorState(body, e, load); });
+    };
+    load();
     if (c.corp) {
-      var cc = card('Archivo corporativo', 'Grupo_Corporativo.xlsx: países, tasas oficiales, catálogo, productos, canales, propuestas e historial', META.hasCorporate ? tag('Importado', 'ok') : tag('Falta', 'warn'));
-      if (cf) add(cc, h('small', { text: 'Último: ' + (cf.file || '') + ' · ' + dt(cf.imported_at) }));
+      var adv = h('details', { class: 'more' }, h('summary', { text: 'Opciones avanzadas: subir otro archivo corporativo o cargar todo de una vez' }));
       var input = h('input', { type: 'file', accept: '.xlsx', id: 'csl-corp-file' });
-      var res = h('div', { 'aria-live': 'polite' });
-      var done = function (r) {
-        toast('Archivo corporativo importado.', 'ok');
-        var counts = obj(r && r.counts);
-        clear(res).appendChild(h('dl', { class: 'dl' }, Object.keys(counts).map(function (k) { return [h('dt', { text: k.replace(/_/g, ' ') }), h('dd', { text: String(counts[k]) })]; })));
-        return reloadMeta();
-      };
-      add(cc, [h('div', { class: 'form-row' }, field('Subir Grupo_Corporativo.xlsx', input), btn('Importar archivo', function (e) {
-        var f = input.files && input.files[0];
-        if (!f) { toast('Elige el archivo .xlsx.', 'bad'); input.focus(); return; }
-        var fd = new FormData(); fd.append('file', f, f.name);
-        busy(e.currentTarget, api('/corporate/import', { method: 'POST', form: fd })).then(done).catch(fail);
-      }, 'primary', {}, 'upload'), btn('Leer del servidor', function (e) {
-        busy(e.currentTarget, post('/corporate/import', { source: 'server' })).then(done).catch(fail);
-      }, 'ghost', {}, 'database')), res]);
-      add(m, cc);
+      add(adv, h('div', { class: 'stack' },
+        h('div', { class: 'form-row' }, field('Subir otro Grupo_Corporativo.xlsx', input), btn('Importar archivo', function (e) {
+          var f = input.files && input.files[0];
+          if (!f) { toast('Elige el archivo .xlsx.', 'bad'); input.focus(); return; }
+          var fd = new FormData(); fd.append('file', f, f.name);
+          busy(e.currentTarget, api('/corporate/import', { method: 'POST', form: fd })).then(function () { toast('Archivo corporativo importado.', 'ok'); return reloadMeta().then(route); }).catch(fail);
+        }, 'ghost', {}, 'upload')),
+        c.admin ? h('div', {}, h('p', { class: 'muted', text: 'Atajo para presentar el resultado sin recorrer los pasos: carga los 20 archivos (4 versiones × 5 países) y envía los que no tienen errores.' }),
+          btn('Cargar todo de una vez', function () { importMeridia(); }, 'ghost', {}, 'database')) : null));
+      add(m, adv);
     }
-    if (c.admin) {
-      var ac = card('Datos de Meridia', 'Solo administradores');
-      add(ac, h('p', { class: 'muted', text: 'Importa el corporativo y los 20 archivos de país (4 versiones × 5 países) desde la carpeta del servidor, por el mismo flujo de lectura y validación que una carga normal.' }));
-      add(ac, h('div', { class: 'acts' }, btn('Importar datos de Meridia', function () { importMeridia(); }, 'primary', {}, 'database'),
-        btn('Reiniciar todo', function () {
-          confirmType('Reiniciar todos los datos', 'Se borran países, versiones, tasas, perfiles editados, archivos, hallazgos, resultados, acciones y bitácora del plugin. No se puede deshacer.', 'BORRAR', 'Borrar todo', function (v) {
-            return post('/demo/reset', { confirm: v }).then(function () {
-              toast('Datos borrados.', 'ok');
-              return reloadMeta().then(function () { setVersion(null); pickVersion(); fillVersionSel(); route(); });
-            });
-          });
-        }, 'danger', {}, 'trash')));
-      add(m, ac);
-    }
+  }
+  /** Paso 0: empezar de cero (borra todo e importa el corporativo del servidor). */
+  function demoStart(body, reload, hasData) {
+    var c = caps();
+    var cd = card('Paso 0 · Empezar de cero', hasData ? 'Deja el sistema vacío para repetir el demo desde el inicio' : 'El sistema está vacío: empieza aquí', hasData ? tag('Datos cargados', 'ok') : tag('Sin datos', 'warn'));
+    add(cd, h('p', { class: 'muted', text: 'Borra todas las cargas, hallazgos, consolidaciones y acciones, y vuelve a importar el archivo corporativo del grupo (países, tasas oficiales, catálogo y propuestas) desde el servidor.' }));
+    if (!c.admin) { add(cd, note('info', 'info', null, 'Solo un administrador puede reiniciar el demo.')); add(body, cd); return; }
+    var go = btn('Reiniciar demo', function () {
+      confirmType('Reiniciar el demo', 'Se borran todos los datos del sistema y se vuelve a importar el archivo corporativo. No se puede deshacer.', 'BORRAR', 'Reiniciar', function (v) {
+        return post('/demo/reset', { confirm: v }).then(function () { return post('/corporate/import', { source: 'server' }); }).then(function () {
+          DASH_CACHE = null; RESULT_BASE = {};
+          return reloadMeta().then(function () { setVersion(DEMO_V1); fillVersionSel(); toast('Demo reiniciado: sistema vacío con el archivo corporativo importado.', 'ok'); route(); });
+        });
+      });
+    }, hasData ? 'danger' : 'primary', {}, hasData ? 'trash' : 'database');
+    add(cd, h('div', { class: 'acts' }, go));
+    add(body, cd);
+  }
+  function demoStatus(H) {
+    var cos = arr(H.companies);
+    return {
+      cos: cos,
+      up: cos.filter(function (x) { return x.upload; }).length,
+      sent: cos.filter(function (x) { return x.upload && x.upload.status === 'enviado'; }).length,
+      crit: cos.reduce(function (s0, x) { return s0 + (x.upload ? Number(x.upload.criticals) || 0 : 0); }, 0),
+      res: !!H.lastResult
+    };
+  }
+  /** Carga en orden los países pendientes de una versión (send: aprobar y enviar los que no tengan críticos). */
+  function demoLoadAll(btnEl, ver, cos, send, done) {
+    var list = cos.filter(function (x) { return !x.upload || (send && x.upload.status !== 'enviado'); });
+    if (!list.length) list = cos;
+    var i = 0, crit = 0;
+    var next = function () {
+      if (i >= list.length) { toast(num(list.length) + ' país(es) cargados' + (crit ? ': ' + num(crit) + ' errores críticos encontrados.' : '.'), crit ? 'bad' : 'ok'); DASH_CACHE = null; done(); return null; }
+      var co = list[i++];
+      btnEl.textContent = 'Cargando ' + (co.country || co.code) + '… (' + i + ' de ' + list.length + ')';
+      return post('/demo/load-one', { company: co.code, version: ver, send: !!send }).then(function (r) {
+        crit += arr(r && r.issues).filter(function (x) { return x.severity === 'critico'; }).length;
+        return next();
+      });
+    };
+    btnEl.disabled = true;
+    Promise.resolve(next()).catch(function (e) { fail(e); done(); });
+  }
+  function demoStep(n, title, what, see, state, actions) {
+    var stTag = state === 'done' ? tag('Hecho', 'ok') : state === 'now' ? tag('Siguiente', 'info') : tag('Pendiente', 'neutral');
+    var cd = card('Paso ' + n + ' · ' + title, null, stTag);
+    cd.classList.add('demo-step', 'st-' + state);
+    add(cd, h('p', { text: what }));
+    if (see) add(cd, h('p', { class: 'muted' }, h('b', { text: 'Qué vas a ver: ' }), see));
+    if (actions && actions.length) add(cd, h('div', { class: 'acts' }, actions));
+    return cd;
+  }
+  function goVersion(ver, hash, base) {
+    return function () { setVersion(ver); fillVersionSel(); if (base) RESULT_BASE[ver] = base; DASH_CACHE = null; location.hash = hash; if (location.hash === hash) route(); };
+  }
+  function demoSteps(body, H1, H2, reload) {
+    var a = demoStatus(H1), b = demoStatus(H2), n1 = a.cos.length || 5;
+    var st = function (done, ready) { return done ? 'done' : ready ? 'now' : 'todo'; };
+    // 1 · cargar v1
+    var b1 = btn(a.up ? 'Volver a cargar los 5 países' : 'Cargar los 5 países', function () { demoLoadAll(b1, DEMO_V1, a.cos, false, reload); }, a.up === n1 ? 'ghost' : 'primary', {}, 'upload');
+    add(body, demoStep(1, 'Cargar el Presupuesto 2027 v1 (la versión con errores)',
+      'Cada país sube su Excel en su propio formato. El sistema lo lee, lo pasa al catálogo del grupo, convierte a US$ y revisa las reglas. Cargados: ' + num(a.up) + ' de ' + num(n1) + (a.up ? ' · ' + num(a.crit) + ' errores críticos encontrados.' : '.'),
+      'en Proceso por país, cada país con su línea de 4 pasos detenida en «Revisado» porque tiene errores críticos. Abre uno para ver lo que leyó el sistema y sus errores con hoja y celda.',
+      st(a.up === n1, true), [b1, a.up ? btn('Ver los países', goVersion(DEMO_V1, '#/proceso'), 'ghost', {}, 'arrowRight') : null]));
+    // 2 · consolidar v1 provisional
+    var b2 = btn(a.res ? 'Volver a consolidar' : 'Consolidar provisional', function () {
+      busy(b2, post('/consolidate', { version: DEMO_V1, force: true })).then(function () { toast('Presupuesto 2027 v1 consolidado (provisional).', 'ok'); DASH_CACHE = null; reload(); }, fail);
+    }, a.res ? 'ghost' : 'primary', { disabled: !a.up }, 'layers');
+    add(body, demoStep(2, 'Consolidar v1 aunque tenga errores',
+      'Une los 5 países en US$, elimina lo que se venden y prestan entre ellos y calcula ROIC, ROCE y EVA. Como hay errores críticos, la consolidación queda marcada como provisional: sirve para medir el efecto de los errores.',
+      'el Inicio con el resultado del grupo y el aviso «provisional»: los errores que más pesan y las decisiones pendientes.',
+      st(a.res, a.up === n1), [b2, a.res ? btn('Ver el resultado de v1', goVersion(DEMO_V1, '#/inicio'), 'ghost', {}, 'arrowRight') : null]));
+    if (!versionByKey(DEMO_V2)) return;
+    // 3 · cargar y enviar v2
+    var n2 = b.cos.length || 5;
+    var b3 = btn(b.up ? 'Volver a cargar y enviar' : 'Cargar y enviar los 5 países', function () { demoLoadAll(b3, DEMO_V2, b.cos, true, reload); }, b.sent === n2 ? 'ghost' : 'primary', { disabled: !a.res }, 'upload');
+    add(body, demoStep(3, 'Cargar el Presupuesto 2027 v2 (la versión corregida) y enviarla',
+      'Los países corrigieron sus archivos. El sistema los lee, no encuentra errores críticos, explica los avisos y cada país aprueba y envía al corporativo. Enviados: ' + num(b.sent) + ' de ' + num(n2) + '.',
+      'en Proceso por país, la línea de cada país llega a «Enviado».',
+      st(b.sent === n2, a.res), [b3, b.up ? btn('Ver los países', goVersion(DEMO_V2, '#/proceso'), 'ghost', {}, 'arrowRight') : null]));
+    // 4 · consolidar v2
+    var b4 = btn(b.res ? 'Volver a consolidar' : 'Consolidar v2', function () {
+      busy(b4, post('/consolidate', { version: DEMO_V2 })).then(function () { toast('Presupuesto 2027 v2 consolidado.', 'ok'); DASH_CACHE = null; reload(); }, fail);
+    }, b.res ? 'ghost' : 'primary', { disabled: b.sent !== n2 }, 'layers');
+    add(body, demoStep(4, 'Consolidar la versión corregida',
+      'Con los 5 países enviados, la consolidación es definitiva: sin errores críticos abiertos.',
+      'la línea de 4 pasos de cada país completa y el resultado definitivo del grupo.',
+      st(b.res, b.sent === n2), [b4]));
+    // 5 · comparar
+    add(body, demoStep(5, 'Comparar la versión corregida con la que tenía errores',
+      'El Inicio de v2 comparado con v1 muestra qué cambió entre las dos: ventas, ROIC, EVA y la cascada de por qué cambian las ventas.',
+      'el resultado definitivo del grupo, quién suma y quién resta valor, los proyectos y las oportunidades de mejora.',
+      st(false, b.res), [btn('Ver el resultado: v2 frente a v1', goVersion(DEMO_V2, '#/inicio', DEMO_V1), b.res ? 'primary' : 'ghost', { disabled: !b.res }, 'arrowRight')]));
   }
 
   /* =====================================================================

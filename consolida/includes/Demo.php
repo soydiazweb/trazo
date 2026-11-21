@@ -234,7 +234,7 @@ class Demo {
 	 * Sube UN archivo de demo (país + versión) desde DATA_DIR por el flujo normal de subida (Data::ingest).
 	 * No aprueba ni envía. Devuelve lo mismo que POST /uploads: {upload, issues}.
 	 */
-	public static function load_one( array $company, string $version_key, int $uid ) {
+	public static function load_one( array $company, string $version_key, int $uid, bool $send = false ) {
 		$base  = realpath( self::DATA_DIR );
 		$files = self::files();
 		if ( ! $base || ! $files ) {
@@ -254,6 +254,10 @@ class Demo {
 			}
 			$version = Store::ensure_version( $c['version'], $c['label'], $c['year'] );
 			$res     = Data::ingest( $company, $version, (string) file_get_contents( $base . '/' . $rel ), basename( $rel ), $uid ); // phpcs:ignore
+			// Con $send, si el archivo no tiene críticos se explican sus avisos, se aprueba y se envía (camino «bueno» del demo).
+			if ( $send && ! is_wp_error( $res ) && empty( $res['upload']['criticals'] ) ) {
+				$res['upload'] = self::approve_and_send( $res['upload'], $uid );
+			}
 			if ( ! is_wp_error( $res ) ) {
 				Log::write( 'demo_cargar_uno', 'upload', (int) $res['upload']['id'], array( 'company' => $company['code'], 'version' => $version_key, 'file' => basename( $rel ) ) );
 			}

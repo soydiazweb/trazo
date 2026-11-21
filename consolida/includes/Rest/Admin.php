@@ -580,7 +580,7 @@ class Admin extends Base {
 		if ( $v && 'cerrado' === $v['status'] ) {
 			return self::err( 'La versión está cerrada: ya no recibe archivos.', 409 );
 		}
-		return self::engine( fn() => Demo::load_one( $c, $key, get_current_user_id() ), 'No se pudo cargar el archivo de demo.' );
+		return self::engine( fn() => Demo::load_one( $c, $key, get_current_user_id(), self::bool( $r, 'send' ) ), 'No se pudo cargar el archivo de demo.' );
 	}
 
 	public static function demo_reset( \WP_REST_Request $r ) {
