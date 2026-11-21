@@ -1141,10 +1141,10 @@
       h('div', { class: 'rchips' }, [
         chip('doc', num(sheets) + ' hojas', 'reconocidas'), chip('calendar', num(arr(st.months).length) + ' meses', 'leídos'),
         chip('log', num(st.accounts) + ' cuentas', 'del catálogo del grupo'), chip('sliders', scale > 1 ? '× ' + num(scale) : 'Unidades', 'escala aplicada'),
-        chip('percent', cur === 'USD' ? 'US$' : cur + ' → US$', 'tasa oficial de cada mes'), chip(crit ? 'alert' : 'check', num(crit) + ' críticos', 'encontrados al revisar')]),
+        chip('percent', cur, cur === 'USD' ? 'moneda del país y del grupo' : 'moneda del país (el grupo lo ve en US$)'), chip(crit ? 'alert' : 'check', num(crit) + ' críticos', 'encontrados al revisar')]),
       isNum(st.revenue_local) ? h('div', { class: 'kpis' }, [
-        kpi('Ingresos del año', usdM(st.revenue_usd), null, cur !== 'USD' ? loc(st.revenue_local, cur) : null),
-        kpi('EBIT del año', usdM(st.ebit_usd), null, 'margen ' + pct(Number(st.revenue_local) ? st.ebit_local / st.revenue_local : null)),
+        kpi('Ingresos del año', loc(st.revenue_local, cur), null, cur !== 'USD' ? usdM(st.revenue_usd) + ' para el grupo' : 'en ' + cur),
+        kpi('EBIT del año', loc(st.ebit_local, cur), null, 'margen ' + pct(Number(st.revenue_local) ? st.ebit_local / st.revenue_local : null)),
         kpi('Archivo', u.file_name || '', null, dt(u.uploaded_at))]) : null);
   }
 
@@ -1245,10 +1245,14 @@
             }, true)));
             else add(cd4, note('info', 'info', null, 'El corporativo consolida cuando los países envían.'));
             var K = r[3], kc = K && K.companies ? K.companies[co.code] : null;
-            if (kc) add(cd4, h('div', { class: 'kpis' }, [
-              kpi('EBIT de ' + (co.country || co.code), usdM(kc.ebit)), kpi('ROIC', pct(kc.roic), null, 'WACC ' + pct(kc.wacc)),
-              kpi('EVA', usdM(kc.eva), Number(kc.eva) < 0 ? 'bad' : 'ok', Number(kc.eva) < 0 ? 'Destruye valor' : 'Crea valor'), kpi('Capital invertido', usdM(kc.ci))
-            ]));
+            if (kc) {
+              var Lc = obj(kc.local), cc = co.currency || 'USD', inLoc = function (lv, uv) { return isNum(lv) ? loc(lv, cc) : usdM(uv); };
+              add(cd4, h('div', { class: 'kpis' }, [
+                kpi('EBIT de ' + (co.country || co.code), inLoc(Lc.ebit, kc.ebit), null, cc !== 'USD' ? usdM(kc.ebit) + ' para el grupo' : null), kpi('ROIC', pct(kc.roic), null, 'WACC ' + pct(kc.wacc)),
+                kpi('EVA', inLoc(Lc.eva, kc.eva), Number(kc.eva) < 0 ? 'bad' : 'ok', (Number(kc.eva) < 0 ? 'Destruye valor' : 'Crea valor') + (cc !== 'USD' ? ' · ' + usdM(kc.eva) : '')),
+                kpi('Capital invertido', inLoc(Lc.ci, kc.ci), null, cc !== 'USD' ? usdM(kc.ci) + ' para el grupo' : null)
+              ]));
+            }
             add(box, cd4);
             add(box, nextBar(true));
           }
@@ -1962,32 +1966,48 @@
   /* =====================================================================
      5 · Reglas y tasas (tasas mensuales, parámetros por país, versiones)
      ===================================================================== */
-  function viewRules() {
+  function viewRules(code) {
     var m = page('reglas');
-    add(m, header(VERSION ? versionLabel(VERSION) : 'Grupo', 'Reglas y tasas', 'Tasas oficiales de los 12 meses, parámetros de cada país y versiones. La consolidación solo usa tasas aprobadas.'));
+    add(m, header(VERSION ? versionLabel(VERSION) : 'Grupo', 'Reglas y tasas por país', 'Elige un país: su moneda, su tasa oficial de cada mes contra el US$ y sus parámetros (impuesto, WACC y participación del grupo).'));
     var body = skel(3); add(m, body);
     var load = function () {
       Promise.all([VERSION ? api('/rates' + qs({ version: VERSION })) : Promise.resolve(null), api('/companies'), api('/users').catch(function () { return []; })]).then(function (r) {
         ready(body);
         watchDirty(body);
-        if (r[0]) add(body, ratesCard(r[0], load));
-        else add(body, note('info', 'info', 'No hay versión seleccionada', 'Crea o importa una versión para cargar sus tasas.'));
-        add(body, paramsCard(arr(r[1], 'companies'), arr(r[2]), load));
-        add(body, versionsCard());
+        var list = arr(r[1], 'companies');
+        if (!list.length) { add(body, empty('No hay países.', 'Importa el archivo corporativo en el Demo guiado.')); return; }
+        var sel = list.filter(function (x) { return x.code === code; })[0] || list[0];
+        add(body, h('div', { class: 'filters' }, seg(list.map(function (x) { return [x.code, (flag(x.code) || '') + ' ' + (x.country || x.code)]; }), sel.code, function (v) { location.hash = '#/reglas/' + v; }, 'País')));
+        var cur = sel.currency || 'USD';
+        var pc = card((sel.country || sel.code) + ' · ' + cur, sel.name || '');
+        add(pc, h('div', { class: 'kpis' }, [
+          kpi('Moneda', cur, null, cur === 'USD' ? 'Igual a la del grupo' : 'Se convierte a US$'),
+          kpi('Impuesto', pct(sel.tax)), kpi('WACC', pct(sel.wacc), null, 'Costo de capital'),
+          kpi('Participación del grupo', pct(sel.ownership), null, Number(sel.ownership) < 1 ? 'Minoritarios ' + pct(1 - Number(sel.ownership)) : 'El grupo es dueño del 100 %')
+        ]));
+        add(pc, h('small', { class: 'muted', text: 'Escala del archivo: ' + (sel.scale || 'unidades') + (sel.data_owner ? ' · Responsable de datos: ' + sel.data_owner : '') + (sel.approver ? ' · Aprueba: ' + sel.approver : '') }));
+        add(body, pc);
+        if (!r[0]) add(body, note('info', 'info', 'No hay versión seleccionada', 'Elige una versión arriba para ver sus tasas.'));
+        else if (cur === 'USD') add(body, note('ok', 'check', (sel.country || sel.code) + ' usa US$', 'No necesita tasa de cambio: 1 US$ = 1 US$ en todos los meses.'));
+        else add(body, ratesCard(r[0], load, cur));
+        var adv = h('details', { class: 'more' }, h('summary', { text: 'Editar parámetros de todos los países y versiones' }));
+        add(adv, [paramsCard(list, arr(r[2]), load), versionsCard()]);
+        add(body, adv);
       }, function (e) { errorState(body, e, load); });
     };
     load();
   }
   /** Tasas mensuales: una tabla por moneda con presupuesto, promedio y cierre (mes 0 = saldo inicial, solo cierre). */
-  function ratesCard(R, reload) {
+  function ratesCard(R, reload, onlyCur) {
     var rows = arr(R.rows), curs = arr(R.currencies).slice(), missing = arr(R.missing);
     rows.forEach(function (x) { if (curs.indexOf(x.currency) < 0) curs.push(x.currency); });
+    if (onlyCur) { curs = curs.filter(function (c0) { return c0 === onlyCur; }); rows = rows.filter(function (x) { return x.currency === onlyCur; }); missing = missing.filter(function (c0) { return c0 === onlyCur; }); }
     var by = {};
     rows.forEach(function (x) { by[x.currency + '|' + x.month] = x; });
     var approved = rows.length && rows.filter(function (x) { return x.month >= 1; }).every(function (x) { return x.status === 'aprobada'; }) && !missing.length;
     var approvedBy = '';
     rows.forEach(function (x) { if (x.status === 'aprobada' && x.approved_by) approvedBy = x.approved_by + (x.approved_at ? ' · ' + dt(x.approved_at) : ''); });
-    var cd = card('Tasas de cambio · ' + versionLabel(VERSION), 'Moneda local por 1 US$. Promedio del mes para resultados, cierre del mes para balance; el mes 0 es el saldo inicial.',
+    var cd = card((onlyCur ? 'Tasa oficial ' + onlyCur + ' por US$' : 'Tasas de cambio') + ' · ' + versionLabel(VERSION), 'Moneda local por 1 US$. Promedio del mes para resultados, cierre del mes para balance; el mes 0 es el saldo inicial.',
       approved ? tag('Aprobadas', 'ok') : tag('Sin aprobar', 'warn'));
     if (approvedBy) add(cd, h('small', { text: 'Aprobadas por ' + approvedBy }));
     if (missing.length) add(cd, note('warn', 'alert', 'Faltan tasas aprobadas', 'Monedas sin los 12 meses aprobados: ' + missing.join(', ') + '. Sin ellas no se puede consolidar.'));
@@ -2610,12 +2630,13 @@
           var spread = isNum(k.roic) && isNum(k.wacc) ? (k.roic - k.wacc) * 100 : null, L = obj(k.local);
           return h('tr', { class: total ? 'total' : null }, h('th', { scope: 'row', text: label }), tdn(usdM(k.ebit)), tdn(usdM(k.nopat)), tdn(usdM(k.ci)),
             tdn(pct(k.roic)), tdn(pct(k.wacc)), tdn(pts(spread), cls(spread)), tdn(pct(k.roce)), tdn(usdM(k.eva), cls(k.eva)),
-            tdn(isNum(L.eva) && k.currency && k.currency !== 'USD' ? loc(L.eva, k.currency) : '—', cls(L.eva)), td(lightTag(k.light)),
+            td(lightTag(k.light)),
             h('td', { class: 'wide' }, arr(k.reasons).length ? h('ul', {}, arr(k.reasons).map(function (t) { return h('li', { text: t }); })) : h('small', { text: '—' })));
         };
         var rows = Object.keys(cos).map(function (code) { return rowOf(coLabel(code), cos[code]); });
         rows.push(rowOf('Grupo consolidado', G, true));
-        add(tc, table([['País'], ['EBIT', 'num'], ['NOPAT', 'num'], ['Capital invertido', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['ROIC − WACC', 'num'], ['ROCE', 'num'], ['EVA', 'num'], ['EVA local', 'num'], ['Semáforo'], ['Razones']], rows, { cards: true, caption: 'Indicadores por país' }));
+        add(tc, table([['País'], ['EBIT', 'num'], ['NOPAT', 'num'], ['Capital invertido', 'num'], ['ROIC', 'num'], ['WACC', 'num'], ['ROIC − WACC', 'num'], ['ROCE', 'num'], ['EVA', 'num'], ['Semáforo'], ['Razones']], rows, { cards: true, caption: 'Indicadores por país' }));
+        add(tc, h('small', { class: 'muted', text: 'Todas las cifras en US$, la moneda del grupo. Cada país ve sus cifras en su moneda en Proceso por país.' }));
         add(body, tc);
         add(body, scenarioCard(K));
         add(body, copiedCard(obj(K.copied)));
@@ -3330,7 +3351,7 @@
       inicio: [goHome, true],
       proceso: [function () { viewProcess(p[1], isNum(p[2]) ? Number(p[2]) : null); }, c.country || c.corp],
       analisis: [function () { viewAnalysis(p[1], p.slice(2)); }, cb],
-      reglas: [viewRules, c.corp], perfiles: [function () { viewProfiles(p[1]); }, c.corp],
+      reglas: [function () { viewRules(p[1]); }, c.corp], perfiles: [function () { viewProfiles(p[1]); }, c.corp],
       bitacora: [function () { viewLog(p[1]); }, c.corp], datos: [viewData, c.corp || c.admin]
     };
     var v = views[k];
