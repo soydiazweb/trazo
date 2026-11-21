@@ -1148,6 +1148,29 @@
         kpi('Archivo', u.file_name || '', null, dt(u.uploaded_at))]) : null);
   }
 
+  /** Paso 3: resumen de lo que se aprueba y se envía a consolidar. */
+  function sendSummary(r, co) {
+    var u = r.upload || {}, sm = r.datasetSummary || {}, st = obj(sm.stats), rows = obj(sm.rows), iss = arr(r.issues);
+    var cur = st.currency || co.currency || 'USD';
+    var fixed = iss.filter(function (i) { return i.status === 'corregida'; }).length, expl = iss.filter(function (i) { return i.status === 'explicada'; }).length;
+    var open = iss.filter(function (i) { return (i.status || 'abierta') === 'abierta' && i.severity === 'critico'; }).length;
+    var mg = Number(st.revenue_local) ? st.ebit_local / st.revenue_local : null;
+    var box = h('div', { class: 'stack' }, h('h3', { class: 'sec-h', text: 'Lo que se aprueba y se envía a consolidar' }));
+    add(box, h('div', { class: 'kpis' }, [
+      kpi('Ingresos del año', isNum(st.revenue_local) ? loc(st.revenue_local, cur) : '—', null, cur !== 'USD' && isNum(st.revenue_usd) ? usdM(st.revenue_usd) + ' para el grupo' : null),
+      kpi('EBIT del año', isNum(st.ebit_local) ? loc(st.ebit_local, cur) : '—', null, 'margen ' + pct(mg) + (cur !== 'USD' && isNum(st.ebit_usd) ? ' · ' + usdM(st.ebit_usd) : '')),
+      kpi('Errores', open ? num(open) + ' abiertos' : 'Resueltos', open ? 'bad' : 'ok', num(fixed) + ' corregidos · ' + num(expl) + ' avisos explicados'),
+      kpi('Operaciones con el grupo', num(rows.ic || 0), null, 'ventas, cuotas y préstamos que se eliminan al consolidar')
+    ]));
+    add(box, h('ul', { class: 'brief-l' }, [
+      h('li', { text: 'Archivo: ' + (u.file_name || '') + ' · cargado el ' + dt(u.uploaded_at) + '.' }),
+      h('li', { text: 'Periodo: ' + num(arr(st.months).length) + ' meses de ' + versionLabel(VERSION) + ' · ' + num(st.accounts) + ' cuentas del catálogo del grupo.' }),
+      h('li', { text: 'Moneda: ' + cur + (cur !== 'USD' ? '; el corporativo lo convierte a US$ con la tasa oficial de cada mes.' : ', igual a la del grupo.') }),
+      h('li', { text: 'Al enviarlo, el corporativo lo suma al grupo, elimina lo que se vende entre empresas y calcula ROIC, ROCE y EVA.' })
+    ]));
+    return box;
+  }
+
   /** Un país como asistente de 4 pasos: se ve un paso a la vez, con su botón de simulación para avanzar. */
   function processOne(m, co, many, stepArg) {
     add(m, header(versionLabel(VERSION), 'Proceso · ' + coLabel(co.code), 'Un paso a la vez. Cada paso tiene un botón «Simular» para resolverlo y avanzar, o puedes hacerlo de verdad (subir, corregir, enviar).', many ? linkBtn('Todos los países', '#/proceso', 'ghost small') : null));
@@ -1160,7 +1183,7 @@
         var f = processFlags(u, H), now = f.indexOf(false), active = isNum(stepArg) && stepArg >= 1 && stepArg <= 4 ? Number(stepArg) : (now < 0 ? 4 : now + 1);
         var canUp = caps().corp || ownsCompany(co.id);
         return Promise.all([
-          u && (active === 1 || active === 2) ? api('/uploads/' + u.id) : null,
+          u && active <= 3 ? api('/uploads/' + u.id) : null,
           u && active === 2 ? api('/findings' + qs({ version: VERSION, company: co.code })).catch(function () { return null; }) : null,
           active === 1 ? api('/uploads' + qs({ company: co.id, version: VERSION })).catch(function () { return []; }) : null,
           active === 4 && H.lastResult && (caps().corp || caps().board) ? maybe(api('/kpi' + qs({ version: VERSION }))).catch(function () { return null; }) : null
@@ -1234,6 +1257,7 @@
               busy(b0, p0.then(function () { return post('/uploads/' + u.id + '/send', {}); })).then(function () { toast((co.country || co.code) + ' enviado al corporativo.', 'ok'); DASH_CACHE = null; go(4); }, fail);
             }, true)));
             else add(cd3, note('info', 'info', null, 'Solo el responsable de datos del país puede aprobar y enviar.'));
+            if (u && r[0]) add(cd3, sendSummary(r[0], co));
             add(box, cd3);
             add(box, nextBar(u && u.status === 'enviado'));
           } else {
