@@ -1337,6 +1337,56 @@
     } else add(bubCard, empty('Sin base para comparar.', 'Elige en «Comparar con» una versión consolidada.'));
     add(body, h('div', { class: 'dash-2' }, evaCard, bubCard));
 
+    /* ---- por qué cambian las ventas + ingresos y EBIT por sede ---- */
+    var VG = D.V && D.V.group ? D.V.group : null;
+    var wfCard = card('Por qué cambian las ventas del grupo', base ? versionLabel(key) + ' frente a ' + bl + ' · US$' : 'Elige una base en «Comparar con»');
+    if (VG && isNum(VG.a) && isNum(VG.b)) {
+      var ef = obj(VG.effects), effs = EFFECTS.filter(function (e) { return isNum(ef[e[0]]) && Math.abs(Number(ef[e[0]])) >= 1; }).map(function (e) { return [e[0], e[1], Number(ef[e[0]])]; });
+      add(wfCard, waterfall(VG.b, bl, effs, VG.a, versionLabel(key)));
+      if (VG.text) add(wfCard, h('p', { class: 'muted', text: VG.text }));
+      add(wfCard, h('div', { class: 'acts' }, linkBtn('Ver el detalle por país', '#/analisis/desviaciones', 'ghost small', 'arrowRight')));
+    } else add(wfCard, empty('Sin comparación de ventas.', base ? 'Consolida la versión base para ver la cascada.' : 'Elige en «Comparar con» otra versión consolidada.'));
+    var reCard = card('Ingresos y EBIT por sede', versionLabel(key) + ' · US$ millones · la parte oscura es el EBIT');
+    var maxRev = Math.max.apply(null, codes.map(function (c) { return Number(cos[c].revenue) || 0; }).concat([1]));
+    add(reCard, h('ul', { class: 'revbars' }, codes.slice().sort(function (a, b) { return (cos[b].revenue || 0) - (cos[a].revenue || 0); }).map(function (c) {
+      var x = cos[c], rv = Number(x.revenue) || 0, eb = Math.max(0, Number(x.ebit) || 0);
+      return h('li', {}, h('span', { class: 'rb-l', text: countryName(c) }),
+        h('span', { class: 'rb-t', role: 'img', 'aria-label': countryName(c) + ': ingresos ' + usdM(rv) + ', EBIT ' + usdM(x.ebit) },
+          h('i', { class: 'rev', style: { width: (rv / maxRev * 100) + '%' } }, h('i', { class: 'ebit', style: { width: (rv ? eb / rv * 100 : 0) + '%' } }))),
+        h('span', { class: 'rb-v tnum' }, h('b', { text: shortM(rv) }), h('small', { text: 'EBIT ' + shortM(x.ebit) + ' · ' + pct(marginOf(x)) })));
+    })));
+    add(reCard, h('small', { class: 'muted', text: 'Margen EBIT del grupo: ' + pct(gm) + '.' }));
+    add(body, h('div', { class: 'dash-2' }, wfCard, reCard));
+
+    /* ---- evolución del grupo + errores por categoría ---- */
+    var evCard = card('Evolución del grupo: ROIC frente a WACC', 'Reales 2023–2025 del historial, real 2026 y presupuestos consolidados (puntos huecos)');
+    var trend = obj(D.Hs && D.Hs.trend), gser = arr(trend.GRUPO);
+    if (!gser.length) {
+      var byYear = {};
+      arr(D.Hs && D.Hs.kpis).forEach(function (r) {
+        var y = byYear[r.year] = byYear[r.year] || { label: r.year + ' real', source: 'historial', nopat: 0, ci: 0, wci: 0 };
+        y.nopat += Number(r.nopat_usd) || 0; y.ci += Number(r.invested_capital_usd) || 0; y.wci += (Number(r.wacc_pct) || 0) / 100 * (Number(r.invested_capital_usd) || 0);
+      });
+      gser = Object.keys(byYear).sort().map(function (k) { var y = byYear[k]; return { label: y.label, source: y.source, roic: y.ci ? y.nopat / y.ci : null, wacc: y.ci ? y.wci / y.ci : null }; });
+    }
+    if (gser.length) {
+      add(evCard, lineChart([
+        { code: 'ROIC', name: 'ROIC', pts: gser.map(function (q) { return { label: q.label, source: q.source, v: q.roic }; }) },
+        { code: 'WACC', name: 'WACC', pts: gser.map(function (q) { return { label: q.label, source: q.source, v: q.wacc }; }) }
+      ], 'v', 'pct', 'ROIC y WACC del grupo'));
+      add(evCard, h('div', { class: 'acts' }, linkBtn('Ver por país', '#/analisis/evolutivo', 'ghost small', 'arrowRight')));
+    } else add(evCard, empty('Sin historial para mostrar.', null));
+    var fcCard = card('Errores encontrados por tipo', versionLabel(key) + (D.F && D.F.counts ? ' · ' + num(D.F.counts.critical) + ' críticos y ' + num(D.F.counts.warning) + ' avisos' : ''));
+    var byCat = D.F && D.F.counts ? obj(D.F.counts.by_category) : {};
+    if (Object.keys(byCat).length) {
+      add(fcCard, categoryBars(byCat, null));
+      var byCo = D.F && D.F.counts ? obj(D.F.counts.by_company) : {};
+      var coRows = Object.keys(byCo).filter(function (c) { return c !== 'GRUPO'; }).sort(function (a, b) { return (byCo[b].total || 0) - (byCo[a].total || 0); });
+      if (coRows.length) add(fcCard, h('p', { class: 'muted', text: 'Por país: ' + coRows.map(function (c) { return countryName(c) + ' ' + num(byCo[c].total); }).join(' · ') + '.' }));
+      add(fcCard, h('div', { class: 'acts' }, linkBtn('Ver los errores por país', '#/proceso', 'ghost small', 'arrowRight')));
+    } else add(fcCard, empty('Sin errores registrados en esta versión.', null));
+    add(body, h('div', { class: 'dash-2' }, evCard, fcCard));
+
     /* ---- ranking + ROIC vs WACC ---- */
     var rk = card('Ranking por sede', 'ROIC = margen × rotación del capital. Toca una sede para ver su detalle.');
     var lowRot = null, lowMar = null;
