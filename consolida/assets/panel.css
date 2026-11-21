@@ -741,3 +741,6 @@ details.fold[open] > summary { border-bottom: 1px solid var(--line); margin-bott
 small.blk { display: block; color: var(--muted); font-weight: 400; }
 a.taglink { text-decoration: none; }
 a.taglink:hover .tag { filter: brightness(.95); text-decoration: underline; }
+/* 0.8.9 · la casilla dentro de los filtros no se estira («.filters input» la ponía al 100 %) */
+.filters .check input[type="checkbox"], .check input[type="checkbox"] { width: auto; flex: none; }
+.filters > .check { align-items: center; }
